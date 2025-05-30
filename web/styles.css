@@ -1,0 +1,12 @@
+/* styles.css */
+.hidden {
+  display: none;
+}
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+}
+input, button, select {
+  margin: 5px 0;
+  display: block;
+}
