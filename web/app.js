@@ -71,13 +71,36 @@ async function loadMessages() {
     headers: { Authorization: "Bearer " + token },
   });
   const msgs = await res.json();
+
+  // Group messages by sender username
+  const grouped = {};
+  msgs.forEach((m) => {
+    const sender = m.Sender.Username || "Unknown";
+    if (!grouped[sender]) {
+      grouped[sender] = [];
+    }
+    grouped[sender].push(m);
+  });
+
   const box = document.getElementById("messages");
   box.innerHTML = "";
-  msgs.forEach((m) => {
-    const div = document.createElement("div");
-    div.textContent = `[${m.CreatedAt}] ${m.Sender.Username}: ${m.Content}`;
-    box.appendChild(div);
-  });
+
+  // Render messages grouped by sender
+  for (const sender in grouped) {
+    // Create sender header
+    const senderHeader = document.createElement("h3");
+    senderHeader.textContent = sender;
+    box.appendChild(senderHeader);
+
+    // Create message list for this sender
+    grouped[sender].forEach((m) => {
+      const div = document.createElement("div");
+      div.textContent = `[${new Date(m.CreatedAt).toLocaleString()}] ${
+        m.Content
+      }`;
+      box.appendChild(div);
+    });
+  }
 }
 
 window.onload = () => {
