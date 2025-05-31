@@ -1,122 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simple Messenger</title>
-  <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
-  <h1>Messenger</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Messenger</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <h1>Messenger</h1>
 
-  <div id="register">
-    <h2>Register</h2>
-    <input id="reg-username" placeholder="Username">
-    <input id="reg-email" placeholder="Email">
-    <input id="reg-password" type="password" placeholder="Password">
-    <button onclick="register()">Register</button>
-  </div>
+    <div id="register">
+      <h2>Register</h2>
+      <input id="reg-username" placeholder="Username" />
+      <input id="reg-email" placeholder="Email" />
+      <input id="reg-password" type="password" placeholder="Password" />
+      <button onclick="register()">Register</button>
+    </div>
 
-  <div id="login">
-    <h2>Login</h2>
-    <input id="login-username" placeholder="Username">
-    <input id="login-password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
-  </div>
+    <div id="login">
+      <h2>Login</h2>
+      <input id="login-username" placeholder="Username" />
+      <input id="login-password" type="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+    </div>
 
-  <div id="main" class="hidden">
-    <h2>Welcome</h2>
-    <label for="users">Select User to Message:</label>
-    <select id="users" title="Recipient User"></select>
-    <input id="message" placeholder="Type a message">
-    <button onclick="sendMessage()">Send</button>
+    <div id="main" class="hidden">
+      <h2>Welcome</h2>
+      <label for="users">Select User to Message:</label>
+      <select id="users" title="Recipient User"></select>
+      <input id="message" placeholder="Type a message" />
+      <button onclick="sendMessage()">Send</button>
 
-    <div id="messages"></div>
-    <button onclick="loadMessages()">Refresh Messages</button>
-  </div>
+      <div id="messages"></div>
+      <button onclick="loadMessages()">Refresh Messages</button>
+      <button onclick="logout()">Log Out</button>
+    </div>
 
-  <script>
-    let token = "";
-    let userId = "";
-
-    async function register() {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: document.getElementById('reg-username').value,
-          email: document.getElementById('reg-email').value,
-          password: document.getElementById('reg-password').value
-        })
-      });
-      alert('Registered');
-    }
-
-    async function login() {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: document.getElementById('login-username').value,
-          password: document.getElementById('login-password').value
-        })
-      });
-      const data = await res.json();
-      token = data.token;
-      localStorage.setItem('token', token);
-      document.getElementById('login').classList.add('hidden');
-      document.getElementById('register').classList.add('hidden');
-      document.getElementById('main').classList.remove('hidden');
-      await loadUsers();
-    }
-
-    async function loadUsers() {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/users', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      const users = await res.json();
-      const select = document.getElementById('users');
-      select.innerHTML = '';
-      users.forEach(user => {
-        let opt = document.createElement('option');
-        opt.value = user.ID;
-        opt.textContent = user.Username;
-        select.appendChild(opt);
-      });
-    }
-
-    async function sendMessage() {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify({
-          receiver_id: document.getElementById('users').value,
-          content: document.getElementById('message').value
-        })
-      });
-      document.getElementById('message').value = '';
-      loadMessages();
-    }
-
-    async function loadMessages() {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/messages', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      const msgs = await res.json();
-      const box = document.getElementById('messages');
-      box.innerHTML = '';
-      msgs.forEach(m => {
-        const div = document.createElement('div');
-        div.textContent = `[${m.CreatedAt}] ${m.Sender.Username}: ${m.Content}`;
-        box.appendChild(div);
-      });
-    }
-  </script>
-</body>
+    <script src="/static/app.js"></script>
+  </body>
 </html>
