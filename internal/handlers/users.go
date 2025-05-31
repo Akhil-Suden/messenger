@@ -9,10 +9,8 @@ import (
 )
 
 func GetUsers(c *gin.Context) {
-	currentUserID := c.GetString("user_id")
-
 	var users []models.User
-	if err := db.DB.Where("id != ?", currentUserID).Find(&users).Error; err != nil {
+	if err := db.DB.Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users"})
 		return
 	}

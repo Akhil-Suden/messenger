@@ -26,9 +26,16 @@ async function login() {
   const data = await res.json();
   token = data.token;
   localStorage.setItem("token", token);
+  localStorage.setItem("username", data.username);
+
   document.getElementById("login").classList.add("hidden");
   document.getElementById("register").classList.add("hidden");
   document.getElementById("main").classList.remove("hidden");
+
+  document.getElementById(
+    "current-user"
+  ).textContent = `Logged in as: ${data.username}`;
+
   await loadUsers();
 }
 
@@ -46,6 +53,18 @@ async function loadUsers() {
     opt.textContent = user.Username;
     select.appendChild(opt);
   });
+
+  // Populate list for viewing messages
+  const list = document.getElementById("user-list");
+  list.innerHTML = "";
+  users.forEach((user) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      ${user.Username} 
+      <button onclick="loadConversationWith('${user.ID}', '${user.Username}')">View Messages</button>
+    `;
+    list.appendChild(li);
+  });
 }
 
 window.onload = () => {
@@ -61,12 +80,16 @@ window.onload = () => {
   document.getElementById("main").classList.remove("hidden");
 
   loadUsers();
-  loadMessages();
   connectWebSocket();
+  document.getElementById(
+    "current-user"
+  ).textContent = `Logged in as: ${localStorage.getItem("username")}`;
 };
 
 function logout() {
   localStorage.removeItem("token");
+  localStorage.removeItem("username");
+
   document.getElementById("main").classList.add("hidden");
   document.getElementById("login").classList.remove("hidden");
   document.getElementById("register").classList.remove("hidden");
@@ -126,43 +149,19 @@ async function sendMessage() {
     }),
   });
   document.getElementById("message").value = "";
-  loadMessages();
 }
 
-async function loadMessages() {
+async function loadConversationWith(senderId, senderName) {
   const token = localStorage.getItem("token");
-  const res = await fetch("/api/messages", {
+  const res = await fetch("/api/messages?sender_id=" + senderId, {
     headers: { Authorization: "Bearer " + token },
   });
   const msgs = await res.json();
-
-  // Group messages by sender username
-  const grouped = {};
-  msgs.forEach((m) => {
-    const sender = m.Sender.Username || "Unknown";
-    if (!grouped[sender]) {
-      grouped[sender] = [];
-    }
-    grouped[sender].push(m);
-  });
-
   const box = document.getElementById("messages");
-  box.innerHTML = "";
-
-  // Render messages grouped by sender
-  for (const sender in grouped) {
-    // Create sender header
-    const senderHeader = document.createElement("h3");
-    senderHeader.textContent = sender;
-    box.appendChild(senderHeader);
-
-    // Create message list for this sender
-    grouped[sender].forEach((m) => {
-      const div = document.createElement("div");
-      div.textContent = `[${new Date(m.CreatedAt).toLocaleString()}] ${
-        m.Content
-      }`;
-      box.appendChild(div);
-    });
-  }
+  box.innerHTML = `<h3>Messages from ${senderName}</h3>`;
+  msgs.forEach((m) => {
+    const div = document.createElement("div");
+    div.textContent = `[${m.CreatedAt}] ${m.Sender.Username}: ${m.Content}`;
+    box.appendChild(div);
+  });
 }

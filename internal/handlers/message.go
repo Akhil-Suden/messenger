@@ -32,9 +32,15 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
+	senderID := c.Query("sender_id")
+	if senderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Sender ID not found in query"})
+		return
+	}
+
 	query := db.DB.Order("created_at desc")
 
-	if err := query.Preload("Sender").Where("receiver_id = ?", receiverID).Find(&messages).Error; err != nil {
+	if err := query.Preload("Sender").Where("receiver_id = ? AND sender_id = ?", receiverID, senderID).Find(&messages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
 		return
 	}
