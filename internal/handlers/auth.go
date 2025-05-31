@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"messenger/internal/db"
+	"messenger/internal/middleware"
 	"messenger/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -77,9 +78,11 @@ func Login(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID.String(),
-		"exp":     time.Now().Add(72 * time.Hour).Unix(),
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, middleware.TokenClaims{
+		UserID: user.ID.String(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(72 * time.Hour)},
+		},
 	})
 
 	tokenString, err := token.SignedString(jwtSecret)

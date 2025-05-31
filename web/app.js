@@ -48,6 +48,70 @@ async function loadUsers() {
   });
 }
 
+window.onload = () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    // If token is missing, stay on login page
+    return;
+  }
+
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("register").classList.add("hidden");
+  document.getElementById("main").classList.remove("hidden");
+
+  loadUsers();
+  loadMessages();
+  connectWebSocket();
+};
+
+function logout() {
+  localStorage.removeItem("token");
+  document.getElementById("main").classList.add("hidden");
+  document.getElementById("login").classList.remove("hidden");
+  document.getElementById("register").classList.remove("hidden");
+}
+
+let socket;
+
+function connectWebSocket() {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  // Replace with your WebSocket endpoint (adjust port/path as needed)
+  const socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+
+  socket.onopen = () => {
+    socket.send(
+      JSON.stringify({
+        token: localStorage.getItem("token"),
+      })
+    );
+    console.log("WebSocket connected");
+  };
+
+  socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    displayIncomingMessage(msg);
+  };
+
+  socket.onclose = () => {
+    console.log("WebSocket closed. Reconnecting...");
+    setTimeout(connectWebSocket, 3000); // retry after 3s
+  };
+
+  socket.onerror = (err) => {
+    console.error("WebSocket error", err);
+  };
+}
+
+function displayIncomingMessage(msg) {
+  const box = document.getElementById("messages");
+  const div = document.createElement("div");
+  div.textContent = `[New] ${msg.from}: ${msg.content}`;
+  box.appendChild(div);
+}
+
 async function sendMessage() {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/messages", {
@@ -101,27 +165,4 @@ async function loadMessages() {
       box.appendChild(div);
     });
   }
-}
-
-window.onload = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    // If token is missing, stay on login page
-    return;
-  }
-
-  document.getElementById("login").classList.add("hidden");
-  document.getElementById("register").classList.add("hidden");
-  document.getElementById("main").classList.remove("hidden");
-
-  loadUsers();
-  loadMessages();
-};
-
-function logout() {
-  localStorage.removeItem("token");
-  document.getElementById("main").classList.add("hidden");
-  document.getElementById("login").classList.remove("hidden");
-  document.getElementById("register").classList.remove("hidden");
 }

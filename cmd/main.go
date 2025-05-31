@@ -4,6 +4,7 @@ import (
 	"log"
 	"messenger/internal/db"     // Optional, for DB connection
 	"messenger/internal/routes" // Your router setup
+	"messenger/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,8 @@ func main() {
 	r.GET("/", func(c *gin.Context) {
 		c.File("../web/index.html")
 	})
+
+	r.GET("/ws", ws.WsHandler)
 
 	// Start server
 	if err := r.Run(":8080"); err != nil {

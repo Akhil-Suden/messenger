@@ -6,6 +6,7 @@ import (
 
 	"messenger/internal/db"
 	"messenger/internal/models"
+	"messenger/internal/ws"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -73,6 +74,18 @@ func SendMessage(c *gin.Context) {
 	if err := db.DB.Create(&message).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
 		return
+	}
+
+	ws.ClientsMu.RLock()
+	receiverConn, ok := ws.Clients[req.ReceiverID]
+	ws.ClientsMu.RUnlock()
+
+	if ok {
+		payload := map[string]string{
+			"from":    senderId,
+			"content": req.Content,
+		}
+		receiverConn.WriteJSON(payload)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})

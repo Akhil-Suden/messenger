@@ -5,8 +5,13 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt/v4"
 )
+
+type TokenClaims struct {
+	UserID string `json:"user_id"`
+	jwt.RegisteredClaims
+}
 
 var jwtSecret = []byte("your-secret-key")
 
