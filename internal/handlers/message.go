@@ -90,11 +90,20 @@ func SendMessage(c *gin.Context) {
 	receiverConn, ok := ws.Clients[req.ReceiverID]
 	ws.ClientsMu.RUnlock()
 
+	senderName, err := repository.GetUsernameFromDB(senderId)
+	if err != nil {
+		log.Printf("Error fetching sender username: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch sender username"})
+		return
+	}
+
 	if ok {
 		payload := map[string]string{
-			"type":    "message",
-			"from":    senderId,
-			"content": req.Content,
+			"type":        "message",
+			"from":        senderId,
+			"sender_name": senderName,
+			"content":     req.Content,
+			"timestamp":   message.CreatedAt.Format(time.RFC3339),
 		}
 		receiverConn.WriteJSON(payload)
 

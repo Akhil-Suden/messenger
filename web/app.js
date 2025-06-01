@@ -1,5 +1,6 @@
 let token = "";
 let userId = "";
+const dividerInsertedMap = {};
 
 async function register() {
   const res = await fetch("/api/register", {
@@ -124,19 +125,48 @@ function connectWebSocket() {
     console.log("WebSocket connected");
   };
 
-  socket.onmessage = (event) => {
+  socket.onmessage = async (event) => {
     const data = JSON.parse(event.data);
+    recieverID = localStorage.getItem("userid");
+
     if (data.type === "unread_update") {
-      const userId = data.from;
+      const senderId = data.from;
       const count = data.count;
 
-      const li = document.getElementById(`user-${userId}`);
+      const li = document.getElementById(`user-${senderId}`);
       if (!li) return;
 
       const unreadSpan = li.querySelector(".unread-count");
       unreadSpan.textContent = count > 0 ? ` (${count} new)` : "";
     } else if (data.type === "message") {
-      showMessagePreviews(data.from, data.content);
+      const senderId = data.from;
+
+      showMessagePreviews(senderId, data.content);
+
+      const scrollable = document.getElementById(
+        `message-scrollable-${data.from}-${recieverID}`
+      );
+      if (!scrollable) return;
+
+      if (!dividerInsertedMap[senderId]) {
+        dividerInsertedMap[senderId] = {};
+      }
+
+      if (dividerInsertedMap[senderId][recieverID] == false) {
+        const divider = document.createElement("div");
+        divider.style.borderTop = "1px solid #888";
+        divider.style.margin = "10px 0";
+        divider.style.paddingTop = "5px";
+        divider.textContent = "--- Unread Messages ---";
+        scrollable.appendChild(divider);
+        dividerInsertedMap[data.from][recieverID] = true;
+      }
+
+      const div = document.createElement("div");
+      const time = new Date(data.timestamp).toLocaleString();
+      div.textContent = `[${time}] ${data.sender_name}: ${data.content}`;
+      scrollable.appendChild(div);
+      await markAsRead(data.from, localStorage.getItem("userid"));
     }
   };
 
@@ -224,39 +254,42 @@ async function viewConversationWith(senderId, recieverId, senderName) {
 
   const scrollable = document.createElement("div");
   scrollable.className = "message-list";
+  scrollable.id = `message-scrollable-${senderId}-${recieverId}`;
   box.appendChild(scrollable);
 
-  let dividerInserted = false;
+  if (!dividerInsertedMap[senderId]) {
+    dividerInsertedMap[senderId] = {};
+  }
+  dividerInsertedMap[senderId][recieverId] = false;
+  let allRead = true;
 
   messages.reverse().forEach((m) => {
-    if (!dividerInserted && !m.Read) {
+    if (!dividerInsertedMap[senderId][recieverId] && !m.Read) {
       const divider = document.createElement("div");
       divider.style.borderTop = "1px solid #888";
       divider.style.margin = "10px 0";
       divider.style.paddingTop = "5px";
       divider.textContent = "--- Unread Messages ---";
       scrollable.appendChild(divider);
-      dividerInserted = true;
+      dividerInsertedMap[senderId][recieverId] = true;
+    }
+    if (!m.Read) {
+      allRead = false;
     }
 
     const div = document.createElement("div");
-    div.textContent = `[${m.CreatedAt}] ${m.Sender.Username}: ${m.Content}`;
+    timestamp = new Date(m.CreatedAt).toLocaleString();
+    div.textContent = `[${timestamp}] ${m.Sender.Username}: ${m.Content}`;
     scrollable.appendChild(div);
   });
 
   scrollable.scrollTop = scrollable.scrollHeight;
 
-  await fetch("/api/messages/read", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    },
-    body: JSON.stringify({
-      sender_id: senderId,
-      receiver_id: recieverId, // Assuming recieverId is the current user's I
-    }),
-  });
+  await markAsRead(senderId, recieverId);
+  if (allRead) {
+    dividerInsertedMap[senderId][recieverId] = false;
+  }
+
   const li = document.getElementById(`user-${senderId}`);
   if (!li) return;
 
@@ -271,3 +304,18 @@ const showMessagePreviews = (senderId, message) => {
   previewEl.textContent = message;
   previewEl.style.opacity = 1;
 };
+
+async function markAsRead(senderId, recieverId) {
+  const token = localStorage.getItem("token");
+  await fetch("/api/messages/read", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    },
+    body: JSON.stringify({
+      sender_id: senderId,
+      receiver_id: recieverId, // Assuming recieverId is the current user's I
+    }),
+  });
+}
