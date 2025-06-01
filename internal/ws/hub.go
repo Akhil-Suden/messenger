@@ -3,16 +3,12 @@ package ws
 import (
 	"encoding/json"
 	"log"
-	"messenger/internal/db"
 	"messenger/internal/middleware"
-	"messenger/internal/models"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -81,48 +77,5 @@ func WsHandler(c *gin.Context) {
 		}
 
 		log.Println("Raw JSON:", string(rawData)) // for debugging
-
-		var baseMsg BaseMessage
-		if err := json.Unmarshal(rawData, &baseMsg); err != nil {
-			log.Println("Failed to parse base message:", err)
-			continue
-		}
-
-		switch baseMsg.Type {
-		case "message":
-			handleChatMesseges(userID, baseMsg.Payload)
-		}
-	}
-}
-
-func handleChatMesseges(userID string, raw json.RawMessage) {
-	var chatMsg models.Message
-	if err := json.Unmarshal(raw, &chatMsg); err != nil {
-		log.Println("Invalid message payload:", err)
-		return
-	}
-	// Process chatMsg
-	chatMsg.ID = uuid.New()
-	chatMsg.SenderID, _ = uuid.Parse(userID)
-	chatMsg.CreatedAt = time.Now()
-
-	if err := db.DB.Create(&chatMsg).Error; err != nil {
-		log.Println("DB save error:", err)
-		return
-	}
-
-	// Send to receiver if online
-	receiverID := chatMsg.ReceiverID.String()
-
-	ClientsMu.RLock()
-	receiverConn, ok := Clients[receiverID]
-	ClientsMu.RUnlock()
-
-	if ok {
-		receiverConn.WriteJSON(map[string]interface{}{
-			"from":    userID,
-			"content": chatMsg.Content,
-			"status":  "delivered",
-		})
 	}
 }

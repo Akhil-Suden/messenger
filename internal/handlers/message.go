@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"time"
 
 	"messenger/internal/db"
 	"messenger/internal/models"
+	"messenger/internal/repository"
 	"messenger/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -40,8 +42,20 @@ func GetMessages(c *gin.Context) {
 
 	query := db.DB.Order("created_at desc")
 
-	if err := query.Preload("Sender").Where("receiver_id = ? AND sender_id = ?", receiverID, senderID).Find(&messages).Error; err != nil {
+	if err := query.Preload("Sender").
+		Where("receiver_id = ? AND sender_id = ?", receiverID, senderID).
+		Find(&messages).Error; err != nil {
+		log.Printf("Error fetching messages: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
+		return
+	}
+
+	// Second: Update read status
+	if err := db.DB.Model(&models.Message{}).
+		Where("receiver_id = ? AND sender_id = ?", receiverID, senderID).
+		Update("read", true).Error; err != nil {
+		log.Printf("Error updating read status: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update read status"})
 		return
 	}
 
@@ -88,10 +102,18 @@ func SendMessage(c *gin.Context) {
 
 	if ok {
 		payload := map[string]string{
+			"type":    "message",
 			"from":    senderId,
 			"content": req.Content,
 		}
 		receiverConn.WriteJSON(payload)
+
+		unreadCount := repository.GetUnreadCountFromDB(senderId, req.ReceiverID)
+		receiverConn.WriteJSON(map[string]interface{}{
+			"type":  "unread_update",
+			"from":  senderId,
+			"count": unreadCount,
+		})
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})

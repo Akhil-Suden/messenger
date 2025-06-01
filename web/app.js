@@ -59,10 +59,12 @@ async function loadUsers() {
   list.innerHTML = "";
   users.forEach((user) => {
     const li = document.createElement("li");
+    li.id = `user-${user.ID}`;
     li.innerHTML = `
-      ${user.Username} 
-      <button onclick="loadConversationWith('${user.ID}', '${user.Username}')">View Messages</button>
-    `;
+    <span class="username">${user.Username}</span> 
+    <span class="unread-count"></span>
+    <button onclick="loadConversationWith('${user.ID}', '${user.Username}')">View Messages</button>
+  `;
     list.appendChild(li);
   });
 }
@@ -114,8 +116,19 @@ function connectWebSocket() {
   };
 
   socket.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    displayIncomingMessage(msg);
+    const data = JSON.parse(event.data);
+    if (data.type === "unread_update") {
+      const userId = data.from;
+      const count = data.count;
+
+      const li = document.getElementById(`user-${userId}`);
+      if (!li) return;
+
+      const unreadSpan = li.querySelector(".unread-count");
+      unreadSpan.textContent = count > 0 ? ` (${count} new)` : "";
+    } else if (data.type === "message") {
+      //do nothing for now
+    }
   };
 
   socket.onclose = () => {
@@ -126,13 +139,6 @@ function connectWebSocket() {
   socket.onerror = (err) => {
     console.error("WebSocket error", err);
   };
-}
-
-function displayIncomingMessage(msg) {
-  const box = document.getElementById("messages");
-  const div = document.createElement("div");
-  div.textContent = `[New] ${msg.from}: ${msg.content}`;
-  box.appendChild(div);
 }
 
 async function sendMessage() {
@@ -159,9 +165,19 @@ async function loadConversationWith(senderId, senderName) {
   const msgs = await res.json();
   const box = document.getElementById("messages");
   box.innerHTML = `<h3>Messages from ${senderName}</h3>`;
-  msgs.forEach((m) => {
+
+  msgs.reverse().forEach((m) => {
     const div = document.createElement("div");
     div.textContent = `[${m.CreatedAt}] ${m.Sender.Username}: ${m.Content}`;
     box.appendChild(div);
   });
+
+  // Scroll to bottom after rendering
+  box.scrollTop = box.scrollHeight;
+
+  const li = document.getElementById(`user-${senderId}`);
+  if (!li) return;
+
+  const unreadSpan = li.querySelector(".unread-count");
+  unreadSpan.textContent = ""; // Clear unread count
 }
