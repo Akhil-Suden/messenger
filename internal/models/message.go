@@ -13,6 +13,7 @@ type Message struct {
 	Content    string    `gorm:"type:text;not null"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"`
 	Read       bool      `gorm:"default:false"`
+	Delivered  bool      `gorm:"default:false"`
 
 	Sender   User `gorm:"foreignKey:SenderID"`
 	Receiver User `gorm:"foreignKey:ReceiverID"`

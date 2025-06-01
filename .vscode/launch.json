@@ -11,6 +11,13 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "buildFlags": ""
+    },
+    {
+      "type": "msedge",
+      "request": "launch",
+      "name": "Launch Edge against localhost",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/web"
     }
   ]
 }

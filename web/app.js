@@ -27,6 +27,7 @@ async function login() {
   token = data.token;
   localStorage.setItem("token", token);
   localStorage.setItem("username", data.username);
+  localStorage.setItem("userid", data.userid);
 
   document.getElementById("login").classList.add("hidden");
   document.getElementById("register").classList.add("hidden");
@@ -54,6 +55,12 @@ async function loadUsers() {
     select.appendChild(opt);
   });
 
+  recieverID = localStorage.getItem("userid");
+  if (!recieverID) {
+    console.error("Receiver ID not found in localStorage");
+    return;
+  }
+
   // Populate list for viewing messages
   const list = document.getElementById("user-list");
   list.innerHTML = "";
@@ -63,9 +70,11 @@ async function loadUsers() {
     li.innerHTML = `
     <span class="username">${user.Username}</span> 
     <span class="unread-count"></span>
-    <button onclick="loadConversationWith('${user.ID}', '${user.Username}')">View Messages</button>
+    <div class="message-preview" id="preview-${user.ID}"></div>
+    <button onclick="viewConversationWith('${user.ID}', '${recieverID}', '${user.Username}')">View Messages</button>
   `;
     list.appendChild(li);
+    loadConversationWith(user.ID, recieverID, user.Username);
   });
 }
 
@@ -127,7 +136,7 @@ function connectWebSocket() {
       const unreadSpan = li.querySelector(".unread-count");
       unreadSpan.textContent = count > 0 ? ` (${count} new)` : "";
     } else if (data.type === "message") {
-      //do nothing for now
+      showMessagePreviews(data.from, data.content);
     }
   };
 
@@ -157,27 +166,108 @@ async function sendMessage() {
   document.getElementById("message").value = "";
 }
 
-async function loadConversationWith(senderId, senderName) {
+async function loadConversationWith(senderId, recieverID, senderName) {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/messages?sender_id=" + senderId, {
     headers: { Authorization: "Bearer " + token },
   });
-  const msgs = await res.json();
-  const box = document.getElementById("messages");
-  box.innerHTML = `<h3>Messages from ${senderName}</h3>`;
+  let unreadCount = 0;
+  const messages = await res.json();
 
-  msgs.reverse().forEach((m) => {
+  const li = document.getElementById(`user-${senderId}`);
+  if (!li) return;
+  const unreadSpan = li.querySelector(".unread-count");
+
+  // Show toast previews for unread messages
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m.Read) {
+      unreadCount++;
+      if (!m.Delivered) {
+        showMessagePreviews(senderId, m.Content);
+        unreadSpan.textContent = unreadCount > 0 ? ` (${unreadCount} new)` : "";
+        // Wait for 500 milliseconds (half a second)
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+  }
+  showMessagePreviews(senderId, messages[0].Content);
+  unreadSpan.textContent = unreadCount > 0 ? ` (${unreadCount} new)` : "";
+
+  await fetch("/api/messages/delivered", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    },
+    body: JSON.stringify({
+      sender_id: senderId,
+      receiver_id: recieverID, // Assuming recieverId is the current user's I
+    }),
+  });
+}
+
+async function viewConversationWith(senderId, recieverId, senderName) {
+  const token = localStorage.getItem("token");
+  const res = await fetch("/api/messages?sender_id=" + senderId, {
+    headers: { Authorization: "Bearer " + token },
+  });
+  const messages = await res.json();
+  if (!messages || messages.length === 0) return;
+
+  const box = document.getElementById("messages");
+  box.innerHTML = "";
+
+  const heading = document.createElement("h3");
+  heading.textContent = `Messages from ${senderName}`;
+  box.appendChild(heading);
+
+  const scrollable = document.createElement("div");
+  scrollable.className = "message-list";
+  box.appendChild(scrollable);
+
+  let dividerInserted = false;
+
+  messages.reverse().forEach((m) => {
+    if (!dividerInserted && !m.Read) {
+      const divider = document.createElement("div");
+      divider.style.borderTop = "1px solid #888";
+      divider.style.margin = "10px 0";
+      divider.style.paddingTop = "5px";
+      divider.textContent = "--- Unread Messages ---";
+      scrollable.appendChild(divider);
+      dividerInserted = true;
+    }
+
     const div = document.createElement("div");
     div.textContent = `[${m.CreatedAt}] ${m.Sender.Username}: ${m.Content}`;
-    box.appendChild(div);
+    scrollable.appendChild(div);
   });
 
-  // Scroll to bottom after rendering
-  box.scrollTop = box.scrollHeight;
+  scrollable.scrollTop = scrollable.scrollHeight;
 
+  await fetch("/api/messages/read", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    },
+    body: JSON.stringify({
+      sender_id: senderId,
+      receiver_id: recieverId, // Assuming recieverId is the current user's I
+    }),
+  });
   const li = document.getElementById(`user-${senderId}`);
   if (!li) return;
 
   const unreadSpan = li.querySelector(".unread-count");
   unreadSpan.textContent = ""; // Clear unread count
 }
+
+const showMessagePreviews = (senderId, message) => {
+  const previewEl = document.getElementById(`preview-${senderId}`);
+  if (!previewEl) return;
+
+  previewEl.textContent = message;
+  previewEl.style.opacity = 1;
+};

@@ -20,6 +20,9 @@ func SetupRouter() *gin.Engine {
 
 	auth.GET("/users", handlers.GetUsers)
 	auth.GET("/messages", handlers.GetMessages)
+	auth.POST("/messages/read", handlers.UpdateReadStatus)
+	auth.POST("/messages/delivered", handlers.UpdateDeliverStatus)
+
 	auth.POST("/messages", handlers.SendMessage)
 
 	// Real-time WebSocket route

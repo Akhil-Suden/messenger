@@ -11,9 +11,19 @@ input, button, select {
   display: block;
 }
 #messages {
+  margin-top: 10px;
+}
+.message-list {
     height: 300px;       
     overflow-y: auto;
     border: 1px solid #ccc;
     padding: 10px;
     margin-top: 10px;
+}
+.message-preview {
+  font-size: 0.85rem;
+  color: #444;
+  margin-top: 4px;
+  opacity: 0.9;
+  transition: opacity 0.3s ease-in-out;
 }

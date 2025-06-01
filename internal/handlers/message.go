@@ -49,16 +49,6 @@ func GetMessages(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
 		return
 	}
-
-	// Second: Update read status
-	if err := db.DB.Model(&models.Message{}).
-		Where("receiver_id = ? AND sender_id = ?", receiverID, senderID).
-		Update("read", true).Error; err != nil {
-		log.Printf("Error updating read status: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update read status"})
-		return
-	}
-
 	c.JSON(http.StatusOK, messages)
 }
 
@@ -117,4 +107,70 @@ func SendMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})
+}
+
+func UpdateReadStatus(c *gin.Context) {
+	var req struct {
+		SenderID   string `json:"sender_id" binding:"required,uuid"`
+		ReceiverID string `json:"receiver_id" binding:"required,uuid"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	senderUUID, err := uuid.Parse(req.SenderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sender_id"})
+		return
+	}
+
+	receiverUUID, err := uuid.Parse(req.ReceiverID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid receiver_id"})
+		return
+	}
+
+	if err := db.DB.Model(&models.Message{}).
+		Where("sender_id = ? AND receiver_id = ? AND read = ?", senderUUID, receiverUUID, false).
+		Update("read", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update read status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Read status updated successfully"})
+}
+
+func UpdateDeliverStatus(c *gin.Context) {
+	var req struct {
+		SenderID   string `json:"sender_id" binding:"required,uuid"`
+		ReceiverID string `json:"receiver_id" binding:"required,uuid"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	senderUUID, err := uuid.Parse(req.SenderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sender_id"})
+		return
+	}
+
+	receiverUUID, err := uuid.Parse(req.ReceiverID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid receiver_id"})
+		return
+	}
+
+	if err := db.DB.Model(&models.Message{}).
+		Where("sender_id = ? AND receiver_id = ? AND delivered = ?", senderUUID, receiverUUID, false).
+		Update("delivered", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update delivered status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "delivered status updated successfully"})
 }
