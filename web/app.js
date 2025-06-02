@@ -1,6 +1,9 @@
 let token = "";
 let userId = "";
 const dividerInsertedMap = {};
+let currentPage = 1;
+const limit = 7;
+let isLoading = false;
 
 async function register() {
   const res = await fetch("/api/register", {
@@ -72,7 +75,7 @@ async function loadUsers() {
     <span class="username">${user.Username}</span> 
     <span class="unread-count"></span>
     <div class="message-preview" id="preview-${user.ID}"></div>
-    <button onclick="viewConversationWith('${user.ID}', '${recieverID}', '${user.Username}')">View Messages</button>
+    <button onclick="viewConversationWith('${user.ID}', '${recieverID}', '${user.Username}', null,true);">View Messages</button>
   `;
     list.appendChild(li);
     loadConversationWith(user.ID, recieverID, user.Username);
@@ -139,34 +142,17 @@ function connectWebSocket() {
       const unreadSpan = li.querySelector(".unread-count");
       unreadSpan.textContent = count > 0 ? ` (${count} new)` : "";
     } else if (data.type === "message") {
-      const senderId = data.from;
+      msg = JSON.parse(data.payload);
+      const senderId = msg.SenderID;
 
-      showMessagePreviews(senderId, data.content);
+      showMessagePreviews(senderId, msg.Content);
 
       const scrollable = document.getElementById(
-        `message-scrollable-${data.from}-${recieverID}`
+        `message-scrollable-${senderId}-${recieverID}`
       );
       if (!scrollable) return;
 
-      if (!dividerInsertedMap[senderId]) {
-        dividerInsertedMap[senderId] = {};
-      }
-
-      if (dividerInsertedMap[senderId][recieverID] == false) {
-        const divider = document.createElement("div");
-        divider.style.borderTop = "1px solid #888";
-        divider.style.margin = "10px 0";
-        divider.style.paddingTop = "5px";
-        divider.textContent = "--- Unread Messages ---";
-        scrollable.appendChild(divider);
-        dividerInsertedMap[data.from][recieverID] = true;
-      }
-
-      const div = document.createElement("div");
-      const time = new Date(data.timestamp).toLocaleString();
-      div.textContent = `[${time}] ${data.sender_name}: ${data.content}`;
-      scrollable.appendChild(div);
-      await markAsRead(data.from, localStorage.getItem("userid"));
+      addSingleMessageAppend(msg, senderId, recieverID, scrollable);
     }
   };
 
@@ -237,11 +223,27 @@ async function loadConversationWith(senderId, recieverID, senderName) {
   });
 }
 
-async function viewConversationWith(senderId, recieverId, senderName) {
+async function viewConversationWith(
+  senderId,
+  recieverId,
+  senderName,
+  scrollTopBefore,
+  isFromViewButton = false
+) {
   const token = localStorage.getItem("token");
-  const res = await fetch("/api/messages?sender_id=" + senderId, {
-    headers: { Authorization: "Bearer " + token },
-  });
+
+  isLoading = true;
+  let msgLimit = currentPage * limit;
+  if (isFromViewButton) {
+    currentPage = 1; // Reset to first page when viewing from button
+    msgLimit = limit; // Reset limit to 20 for the first view
+  }
+  const res = await fetch(
+    `/api/messages?sender_id=${senderId}&page=1&limit=${msgLimit}`,
+    {
+      headers: { Authorization: "Bearer " + token },
+    }
+  );
   const messages = await res.json();
   if (!messages || messages.length === 0) return;
 
@@ -255,38 +257,23 @@ async function viewConversationWith(senderId, recieverId, senderName) {
   const scrollable = document.createElement("div");
   scrollable.className = "message-list";
   scrollable.id = `message-scrollable-${senderId}-${recieverId}`;
+  scrollable.dataset.allRead = "true";
+
   box.appendChild(scrollable);
 
-  if (!dividerInsertedMap[senderId]) {
-    dividerInsertedMap[senderId] = {};
-  }
-  dividerInsertedMap[senderId][recieverId] = false;
-  let allRead = true;
-
-  messages.reverse().forEach((m) => {
-    if (!dividerInsertedMap[senderId][recieverId] && !m.Read) {
-      const divider = document.createElement("div");
-      divider.style.borderTop = "1px solid #888";
-      divider.style.margin = "10px 0";
-      divider.style.paddingTop = "5px";
-      divider.textContent = "--- Unread Messages ---";
-      scrollable.appendChild(divider);
-      dividerInsertedMap[senderId][recieverId] = true;
-    }
-    if (!m.Read) {
-      allRead = false;
-    }
-
-    const div = document.createElement("div");
-    timestamp = new Date(m.CreatedAt).toLocaleString();
-    div.textContent = `[${timestamp}] ${m.Sender.Username}: ${m.Content}`;
-    scrollable.appendChild(div);
-  });
-
-  scrollable.scrollTop = scrollable.scrollHeight;
+  addMessagesInScrollable(
+    scrollable,
+    messages,
+    senderId,
+    recieverId,
+    senderName,
+    scrollTopBefore
+  );
+  isLoading = false;
 
   await markAsRead(senderId, recieverId);
-  if (allRead) {
+
+  if (scrollable.dataset.allRead == "true") {
     dividerInsertedMap[senderId][recieverId] = false;
   }
 
@@ -318,4 +305,265 @@ async function markAsRead(senderId, recieverId) {
       receiver_id: recieverId, // Assuming recieverId is the current user's I
     }),
   });
+}
+
+async function showDeleteOptionsForSelf(
+  msgId,
+  senderId,
+  senderName,
+  scrollable
+) {
+  token = localStorage.getItem("token");
+  if (!token) {
+    console.error("Token not found in localStorage");
+    return;
+  }
+
+  const scrollTopBefore = scrollable.scrollTop;
+
+  recieverId = localStorage.getItem("userid");
+  if (!recieverId) {
+    console.error("Receiver ID not found in localStorage");
+    return;
+  }
+  const choice = confirm("Delete for self?");
+  if (choice) {
+    await fetch(`/api/messages/delete/self`, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        message_id: msgId,
+        user_id: recieverId, // Assuming recieverId is the current user's I
+      }),
+    });
+    viewConversationWith(
+      senderId,
+      recieverId,
+      senderName,
+      scrollTopBefore,
+      false
+    );
+  }
+}
+
+async function showDeleteOptionsForEveryone(
+  msgId,
+  senderId,
+  senderName,
+  scrollable
+) {
+  token = localStorage.getItem("token");
+  if (!token) {
+    console.error("Token not found in localStorage");
+    return;
+  }
+
+  const scrollTopBefore = scrollable.scrollTop;
+
+  recieverId = localStorage.getItem("userid");
+  if (!recieverId) {
+    console.error("Receiver ID not found in localStorage");
+    return;
+  }
+  const choice = confirm(
+    "Delete for everyone?\nPress Cancel to delete for self only."
+  );
+  if (choice) {
+    await fetch(`/api/messages/delete/everyone`, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        message_id: msgId,
+      }),
+    });
+    viewConversationWith(
+      senderId,
+      recieverId,
+      senderName,
+      scrollTopBefore,
+      false
+    );
+  } else {
+    await fetch(`/api/messages/delete/self`, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        message_id: msgId,
+        user_id: recieverId, // Assuming recieverId is the current user's I
+      }),
+    });
+    viewConversationWith(
+      senderId,
+      recieverId,
+      senderName,
+      scrollTopBefore,
+      false
+    );
+  }
+}
+
+async function loadMoreMessages(senderId, recieverId) {
+  if (isLoading) return;
+  isLoading = true;
+  currentPage++;
+
+  const token = localStorage.getItem("token");
+  const res = await fetch(
+    `/api/messages?sender_id=${senderId}&page=${currentPage}&limit=${limit}`,
+    {
+      headers: { Authorization: "Bearer " + token },
+    }
+  );
+  const newMessages = await res.json();
+  if (newMessages.length === 0) {
+    currentPage--;
+    return; // No more messages
+  }
+
+  const scrollable = document.getElementById(
+    `message-scrollable-${senderId}-${recieverId}`
+  );
+
+  const prevScrollHeight = scrollable.scrollHeight;
+
+  newMessages.forEach((m) => {
+    const div = document.createElement("div");
+    addSingleMessagePrepend(m, senderId, recieverId, scrollable);
+    scrollable.prepend(div); // Add at top
+  });
+
+  // Maintain scroll position
+  scrollable.scrollTop = scrollable.scrollHeight - prevScrollHeight;
+
+  isLoading = false;
+}
+
+function addMessagesInScrollable(
+  scrollable,
+  messages,
+  senderId,
+  recieverId,
+  senderName,
+  scrollTopBefore
+) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    addSingleMessageAppend(m, senderId, recieverId, scrollable);
+    if (!m.Read) {
+      scrollable.dataset.allRead = "false";
+    }
+  }
+
+  if (scrollTopBefore == null) {
+    scrollTopBefore = scrollable.scrollHeight; // Default to bottom if not provided
+  }
+
+  scrollable.scrollTop = scrollTopBefore;
+  scrollable.addEventListener("scroll", () => {
+    if (scrollable.scrollTop === 0) {
+      loadMoreMessages(senderId, recieverId);
+    }
+  });
+}
+
+function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
+  if (!dividerInsertedMap[senderId]) {
+    dividerInsertedMap[senderId] = {};
+  }
+
+  if (!dividerInsertedMap[senderId][recieverId] && !m.Read) {
+    const divider = document.createElement("div");
+    divider.style.borderTop = "1px solid #888";
+    divider.style.margin = "10px 0";
+    divider.style.paddingTop = "5px";
+    divider.textContent = "--- Unread Messages ---";
+    scrollable.appendChild(divider);
+    dividerInsertedMap[senderId][recieverId] = true;
+  }
+
+  const div = document.createElement("div");
+
+  if (m.DeletedForSelfBy && m.DeletedForSelfBy.includes(recieverId)) {
+    console.log("Message deleted for self by receiver");
+    return;
+  }
+
+  timestamp = new Date(m.CreatedAt).toLocaleString();
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "🗑️";
+  if (m.IsDeleted) {
+    div.textContent = `[${timestamp}] ${m.Sender.Username}: "This message was deleted."`;
+    div.style.color = "red";
+    deleteBtn.onclick = () =>
+      showDeleteOptionsForSelf(
+        m.ID,
+        m.Sender.ID,
+        m.Sender.Username,
+        scrollable
+      );
+  } else {
+    div.textContent = `[${timestamp}] ${m.Sender.Username}: ${m.Content}`;
+    deleteBtn.onclick = () =>
+      showDeleteOptionsForEveryone(
+        m.ID,
+        senderId,
+        m.Sender.Username,
+        scrollable
+      );
+  }
+
+  div.appendChild(deleteBtn);
+  scrollable.appendChild(div);
+}
+
+function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
+  if (!dividerInsertedMap[senderId]) {
+    dividerInsertedMap[senderId] = {};
+  }
+
+  if (!dividerInsertedMap[senderId][recieverId] && !m.Read) {
+    const divider = document.createElement("div");
+    divider.style.borderTop = "1px solid #888";
+    divider.style.margin = "10px 0";
+    divider.style.paddingTop = "5px";
+    divider.textContent = "--- Unread Messages ---";
+    scrollable.appendChild(divider);
+    dividerInsertedMap[senderId][recieverId] = true;
+  }
+
+  const div = document.createElement("div");
+
+  if (m.DeletedForSelfBy && m.DeletedForSelfBy.includes(recieverId)) {
+    console.log("Message deleted for self by receiver");
+    return;
+  }
+
+  timestamp = new Date(m.CreatedAt).toLocaleString();
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "🗑️";
+  if (m.IsDeleted) {
+    div.textContent = `[${timestamp}] ${m.Sender.Username}: "This message was deleted."`;
+    div.style.color = "red";
+    deleteBtn.onclick = () =>
+      showDeleteOptionsForSelf(
+        m.ID,
+        m.Sender.ID,
+        m.Sender.Username,
+        scrollable
+      );
+  } else {
+    div.textContent = `[${timestamp}] ${m.Sender.Username}: ${m.Content}`;
+    deleteBtn.onclick = () =>
+      showDeleteOptionsForEveryone(
+        m.ID,
+        senderId,
+        m.Sender.Username,
+        scrollable
+      );
+  }
+
+  div.appendChild(deleteBtn);
+  scrollable.prepend(div); // Add at top
 }

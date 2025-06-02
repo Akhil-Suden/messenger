@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"messenger/internal/db"
@@ -40,10 +42,24 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
+	pageStr := c.Query("page")
+	limitStr := c.Query("limit")
+
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	if page < 1 {
+		page = 1
+	}
+	if limit == 0 {
+		limit = 20 // default
+	}
+	offset := (page - 1) * limit
+
 	query := db.DB.Order("created_at desc")
 
 	if err := query.Preload("Sender").
-		Where("receiver_id = ? AND sender_id = ?", receiverID, senderID).
+		Where("receiver_id = ? AND sender_id = ? AND NOT (? = ANY(deleted_for_self_by))", receiverID, senderID, receiverID).Offset(offset).
+		Limit(limit).
 		Find(&messages).Error; err != nil {
 		log.Printf("Error fetching messages: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
@@ -96,14 +112,13 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch sender username"})
 		return
 	}
+	message.Sender = models.User{Username: senderName}
 
+	msgMar, _ := json.Marshal(message) // Ensure message is marshaled for logging
 	if ok {
 		payload := map[string]string{
-			"type":        "message",
-			"from":        senderId,
-			"sender_name": senderName,
-			"content":     req.Content,
-			"timestamp":   message.CreatedAt.Format(time.RFC3339),
+			"type":    "message",
+			"payload": string(msgMar),
 		}
 		receiverConn.WriteJSON(payload)
 
@@ -182,4 +197,49 @@ func UpdateDeliverStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "delivered status updated successfully"})
+}
+
+func DeleteMessageForSelf(c *gin.Context) {
+	var req struct {
+		MessageID uuid.UUID `json:"message_id"`
+		UserID    string    `json:"user_id"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+		return
+	}
+
+	var msg models.Message
+	if err := db.DB.First(&msg, "id = ?", req.MessageID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
+		return
+	}
+
+	// Append user ID to DeletedForSelfBy
+	msg.DeletedForSelfBy = append(msg.DeletedForSelfBy, req.UserID)
+	if err := db.DB.Save(&msg).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update message"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "message hidden for user"})
+}
+
+func DeleteMessageForEveryone(c *gin.Context) {
+	var req struct {
+		MessageID uuid.UUID `json:"message_id"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+		return
+	}
+
+	if err := db.DB.Model(&models.Message{}).
+		Where("id = ?", req.MessageID).
+		Update("is_deleted", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete message"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "message deleted for all"})
 }
