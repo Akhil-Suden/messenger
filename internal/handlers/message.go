@@ -51,14 +51,14 @@ func GetMessages(c *gin.Context) {
 		page = 1
 	}
 	if limit == 0 {
-		limit = 20 // default
+		limit = 1000 // default
 	}
 	offset := (page - 1) * limit
 
 	query := db.DB.Order("created_at desc")
 
 	if err := query.Preload("Sender").
-		Where("receiver_id = ? AND sender_id = ? AND NOT (? = ANY(deleted_for_self_by))", receiverID, senderID, receiverID).Offset(offset).
+		Where("((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND NOT (? = ANY(deleted_for_self_by))", receiverID, senderID, senderID, receiverID, receiverID).Offset(offset).
 		Limit(limit).
 		Find(&messages).Error; err != nil {
 		log.Printf("Error fetching messages: %v", err)
@@ -103,7 +103,11 @@ func SendMessage(c *gin.Context) {
 	}
 
 	ws.ClientsMu.RLock()
-	receiverConn, ok := ws.Clients[req.ReceiverID]
+	receiverConn, ok1 := ws.Clients[req.ReceiverID]
+	ws.ClientsMu.RUnlock()
+
+	ws.ClientsMu.RLock()
+	senderConn, ok2 := ws.Clients[senderId]
 	ws.ClientsMu.RUnlock()
 
 	senderName, err := repository.GetUsernameFromDB(senderId)
@@ -113,21 +117,16 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 	message.Sender = models.User{Username: senderName}
-
 	msgMar, _ := json.Marshal(message) // Ensure message is marshaled for logging
-	if ok {
-		payload := map[string]string{
-			"type":    "message",
-			"payload": string(msgMar),
-		}
+	payload := map[string]string{
+		"type":    "message",
+		"payload": string(msgMar),
+	}
+	if ok1 {
 		receiverConn.WriteJSON(payload)
-
-		unreadCount := repository.GetUnreadCountFromDB(senderId, req.ReceiverID)
-		receiverConn.WriteJSON(map[string]interface{}{
-			"type":  "unread_update",
-			"from":  senderId,
-			"count": unreadCount,
-		})
+	}
+	if ok2 && !(senderId == req.ReceiverID) {
+		senderConn.WriteJSON(payload)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})
@@ -210,7 +209,7 @@ func DeleteMessageForSelf(c *gin.Context) {
 	}
 
 	var msg models.Message
-	if err := db.DB.First(&msg, "id = ?", req.MessageID).Error; err != nil {
+	if err := db.DB.Preload("Sender").Preload("Receiver").First(&msg, "id = ?", req.MessageID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
 		return
 	}
@@ -220,6 +219,19 @@ func DeleteMessageForSelf(c *gin.Context) {
 	if err := db.DB.Save(&msg).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update message"})
 		return
+	}
+
+	ws.ClientsMu.RLock()
+	userConn, ok := ws.Clients[req.UserID]
+	ws.ClientsMu.RUnlock()
+
+	msgMar, _ := json.Marshal(msg) // Ensure message is marshaled for logging
+	payload := map[string]string{
+		"type":    "message_deleted",
+		"payload": string(msgMar),
+	}
+	if ok {
+		userConn.WriteJSON(payload)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "message hidden for user"})
@@ -234,11 +246,37 @@ func DeleteMessageForEveryone(c *gin.Context) {
 		return
 	}
 
-	if err := db.DB.Model(&models.Message{}).
-		Where("id = ?", req.MessageID).
-		Update("is_deleted", true).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete message"})
+	var message models.Message
+	if err := db.DB.Preload("Sender").Preload("Receiver").First(&message, "id = ?", req.MessageID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
 		return
+	}
+
+	// Update the message as deleted
+	if err := db.DB.Model(&message).Update("is_deleted", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message"})
+		return
+	}
+
+	ws.ClientsMu.RLock()
+	recieverConn, ok1 := ws.Clients[string(message.ReceiverID.String())]
+	ws.ClientsMu.RUnlock()
+
+	ws.ClientsMu.RLock()
+	senderConn, ok2 := ws.Clients[string(message.SenderID.String())]
+	ws.ClientsMu.RUnlock()
+
+	msgMar, _ := json.Marshal(message) // Ensure message is marshaled for logging
+	payload := map[string]string{
+		"type":    "message_deleted",
+		"payload": string(msgMar),
+	}
+	if ok1 {
+		recieverConn.WriteJSON(payload)
+	}
+
+	if ok2 {
+		senderConn.WriteJSON(payload)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "message deleted for all"})

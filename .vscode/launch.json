@@ -13,9 +13,9 @@
       "buildFlags": ""
     },
     {
-      "type": "msedge",
+      "type": "chrome",
       "request": "launch",
-      "name": "Launch Edge against localhost",
+      "name": "Launch Chrome against localhost",
       "url": "http://localhost:8080",
       "webRoot": "${workspaceFolder}/web"
     }
