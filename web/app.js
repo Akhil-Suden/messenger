@@ -36,11 +36,9 @@ async function login() {
   document.getElementById("login").classList.add("hidden");
   document.getElementById("register").classList.add("hidden");
   document.getElementById("main").classList.remove("hidden");
-
-  document.getElementById(
-    "current-user"
-  ).textContent = `Logged in as: ${data.username}`;
-
+  document.getElementById("current-user").classList.remove("hidden");
+  document.getElementById("username-display").textContent = `${data.username}`;
+  document.getElementById("logout-btn").addEventListener("click", logout);
   await loadUsers();
 }
 
@@ -59,7 +57,7 @@ async function loadUsers() {
   }
 
   // Populate list for viewing messages
-  const list = document.getElementById("user-list");
+  const list = document.getElementById("chat-list");
   list.innerHTML = "";
   users.forEach((sender) => {
     const li = document.createElement("li");
@@ -86,12 +84,14 @@ window.onload = () => {
   document.getElementById("login").classList.add("hidden");
   document.getElementById("register").classList.add("hidden");
   document.getElementById("main").classList.remove("hidden");
+  document.getElementById("current-user").classList.remove("hidden");
 
   loadUsers();
   connectWebSocket();
   document.getElementById(
-    "current-user"
-  ).textContent = `Logged in as: ${localStorage.getItem("username")}`;
+    "username-display"
+  ).textContent = `${localStorage.getItem("username")}`;
+  document.getElementById("logout-btn").addEventListener("click", logout);
 };
 
 function logout() {
@@ -270,12 +270,14 @@ async function viewConversationWith(
   const messages = await res.json();
   if (!messages || messages.length === 0) return;
 
-  const box = document.getElementById("messages");
+  const box = document.getElementById("message-area");
   box.innerHTML = "";
 
-  const heading = document.createElement("h3");
-  heading.textContent = `Conversation with ${senderName}`;
-  box.appendChild(heading);
+  const header = document.createElement("div");
+  header.className = "message-header";
+  header.id = "message-header";
+  header.textContent = `Conversation with ${senderName}`;
+  box.appendChild(header);
 
   const scrollable = document.createElement("div");
   scrollable.className = "message-list";

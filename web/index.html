@@ -7,7 +7,13 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <h1>Messenger</h1>
+    <div class="header">
+      <h1>Messenger</h1>
+      <div id="current-user" class="hidden">
+        <div id="username-display"></div>
+        <button id="logout-btn">Logout</button>
+      </div>
+    </div>
 
     <div id="register">
       <h2>Register</h2>
@@ -25,13 +31,20 @@
     </div>
 
     <div id="main" class="hidden">
-      <h2>Welcome</h2>
-      <div id="current-user"></div>
+      <div class="chat-container">
+        <div class="chat-list" id="chat-list"></div>
 
-      <h3>Users</h3>
-      <ul id="user-list"></ul>
-      <div id="messages"></div>
-      <button onclick="logout()">Log Out</button>
+        <div class="message-area" id="message-area">
+          <div class="message-header" id="message-header">
+            <!-- JavaScript will insert heading text here -->
+          </div>
+          <div class="message-list" id="message-scrollable"></div>
+
+          <div class="message-input-container" id="message-input-container">
+            <!-- Text input and send button will be inserted here -->
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="/static/app.js"></script>
