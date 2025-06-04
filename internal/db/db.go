@@ -2,6 +2,7 @@ package db
 
 import (
 	"messenger/internal/models"
+	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -10,9 +11,8 @@ import (
 var DB *gorm.DB
 
 func Connect() error {
-	dsn := "host=localhost user=postgres password=admin dbname=messenger port=5432 sslmode=disable"
-	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	dsn := os.Getenv("DATABASE_URL") // Set this in environment
+	DB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return err
 	}

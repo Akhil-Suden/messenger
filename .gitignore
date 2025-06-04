@@ -2,3 +2,4 @@ cmd/cmd.exe
 cmd/__debug_bin2349244354.exe
 main.exe
 cmd/__debug_*.exe
+config/.env
