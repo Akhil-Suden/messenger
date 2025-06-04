@@ -39,6 +39,7 @@ async function login() {
   document.getElementById("current-user").classList.remove("hidden");
   document.getElementById("username-display").textContent = `${data.username}`;
   document.getElementById("logout-btn").addEventListener("click", logout);
+  connectWebSocket();
   await loadUsers();
 }
 
@@ -110,7 +111,9 @@ function connectWebSocket() {
   if (!token) return;
 
   // Replace with your WebSocket endpoint (adjust port/path as needed)
-  const socket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
+  const socket = new WebSocket(
+    `wss://${window.location.host}/ws?token=${token}`
+  );
 
   socket.onopen = () => {
     socket.send(
