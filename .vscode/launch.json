@@ -18,6 +18,13 @@
       "name": "Launch Chrome against localhost",
       "url": "http://localhost:8080",
       "webRoot": "${workspaceFolder}/web"
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Launch Chrome against lan ip",
+      "url": "http://192.168.1.102:8080",
+      "webRoot": "${workspaceFolder}/web"
     }
   ]
 }

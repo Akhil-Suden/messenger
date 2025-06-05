@@ -9,7 +9,7 @@ export function connectWebSocket() {
   // Replace with your WebSocket endpoint (adjust port/path as needed)
   if (window.location.protocol === "http:") {
     // For local development, use the local server
-    socket = new WebSocket("ws://localhost:8080/ws?token=" + token);
+    socket = new WebSocket(`ws://${window.location.host}/ws?token=` + token);
   } else {
     // For production, use the secure WebSocket connection
     socket = new WebSocket(`wss://${window.location.host}/ws?token=${token}`);
