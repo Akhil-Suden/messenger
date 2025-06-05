@@ -12,7 +12,8 @@ var DB *gorm.DB
 
 func Connect() error {
 	dsn := os.Getenv("DATABASE_URL") // Set this in environment
-	DB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	var err error
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return err
 	}
