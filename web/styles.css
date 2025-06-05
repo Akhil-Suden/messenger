@@ -199,7 +199,7 @@ select {
   background-color: #e5d4d8;
   position: relative;
   height: 80vh;
-  margin-bottom:150px;
+  margin-bottom:250px;
 }
 
 @media (max-width: 768px) {

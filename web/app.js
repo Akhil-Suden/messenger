@@ -271,7 +271,6 @@ async function viewConversationWith(
     }
   );
   const messages = await res.json();
-  if (!messages || messages.length === 0) return;
 
   const box = document.getElementById("message-area");
   box.innerHTML = "";
