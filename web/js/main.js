@@ -22,5 +22,7 @@ window.onload = () => {
   document.getElementById(
     "username-display"
   ).textContent = `${localStorage.getItem("username")}`;
+  messages.resetDividerInsertedMap();
+  messages.resetCurrentScrollableId();
   document.getElementById("logout-btn").addEventListener("click", auth.logout);
 };

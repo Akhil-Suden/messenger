@@ -1,4 +1,5 @@
-export const dividerInsertedMap = {};
+export let dividerInsertedMap = {};
+export let currentScrollableId = "";
 export let currentPage = 1;
 export const limit = 1000;
 export let isLoading = false;
@@ -18,18 +19,27 @@ export async function loadUsers() {
     return;
   }
 
-  // Populate list for viewing messages
   const list = document.getElementById("chat-list");
   list.innerHTML = "";
+
   users.forEach((sender) => {
     const li = document.createElement("li");
     li.id = `user-${sender.ID}`;
+    li.classList.add("chat-item"); // add the CSS class for styling
+
     li.innerHTML = `
-    <span class="username">${sender.Username}</span> 
-    <span class="unread-count"></span>
-    <div class="message-preview" id="preview-${sender.ID}"></div>
-    <button onclick="viewConversationWith('${sender.ID}', '${userID}', '${sender.Username}', null,true);">View Messages</button>
+    <div class="chat-info">
+      <div class="chat-username">${sender.Username}</div>
+      <div class="message-preview" id="preview-${sender.ID}"></div>
+    </div>
+    <div class="chat-unread-count" id="unread-${sender.ID}"></div>
   `;
+
+    // Optional: make the whole li clickable instead of a separate button
+    li.addEventListener("click", () => {
+      viewConversationWith(sender.ID, userID, sender.Username, null, true);
+    });
+
     list.appendChild(li);
     loadConversationWith(sender.ID, userID, sender.Username);
   });
@@ -91,13 +101,18 @@ export function showCount(senderId) {
   const li = document.getElementById(`user-${senderId}`);
   if (!li) return;
 
-  const unreadSpan = li.querySelector(".unread-count");
+  // Corrected selector for unread count div
+  const unreadSpan = li.querySelector(".chat-unread-count");
+  if (!unreadSpan) return;
+
   const match = unreadSpan.textContent.match(/\d+/);
   const count = match ? parseInt(match[0], 10) : 0;
 
   const newCount = count + 1;
-
-  unreadSpan.textContent = newCount > 0 ? ` (${newCount} new)` : "";
+  unreadSpan.textContent = newCount > 0 ? `${newCount}` : "";
+  if (newCount > 0) {
+    unreadSpan.style.display = "inline"; // Show the count
+  }
 }
 
 export async function viewConversationWith(
@@ -107,6 +122,7 @@ export async function viewConversationWith(
   scrollTopBefore,
   isFromViewButton = false
 ) {
+  currentScrollableId = getScrollableId(senderId, recieverId);
   const token = localStorage.getItem("token");
 
   isLoading = true;
@@ -167,18 +183,6 @@ export async function viewConversationWith(
     scrollTopBefore
   );
   isLoading = false;
-
-  await markAsRead(senderId, recieverId);
-
-  if (scrollable.dataset.allRead === "true") {
-    dividerInsertedMap[getScrollableId(senderId, recieverId)] = false;
-  }
-
-  const li = document.getElementById(`user-${senderId}`);
-  if (!li) return;
-
-  const unreadSpan = li.querySelector(".unread-count");
-  unreadSpan.textContent = ""; // Clear unread count
 }
 
 window.viewConversationWith = viewConversationWith;
@@ -322,7 +326,7 @@ export async function loadMoreMessages(senderId, recieverId) {
   isLoading = false;
 }
 
-export function addMessagesInScrollable(
+export async function addMessagesInScrollable(
   scrollable,
   messages,
   senderId,
@@ -333,6 +337,10 @@ export function addMessagesInScrollable(
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     addSingleMessageAppend(m, senderId, recieverId, scrollable);
+  }
+
+  if (senderId !== userId) {
+    await markAsRead(senderId, recieverId);
   }
 
   if (scrollTopBefore === null) {
@@ -347,7 +355,12 @@ export function addMessagesInScrollable(
   });
 }
 
-export function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
+export async function addSingleMessageAppend(
+  m,
+  senderId,
+  recieverId,
+  scrollable
+) {
   userId = localStorage.getItem("userid");
   if (!userId) return;
 
@@ -412,6 +425,18 @@ export function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
 
   div.appendChild(deleteBtn);
   scrollable.appendChild(div);
+
+  if (scrollable.dataset.allRead === "true") {
+    //if there is no divider inserted
+    dividerInsertedMap[getScrollableId(senderId, recieverId)] = false;
+  }
+
+  const li = document.getElementById(`user-${senderId}`);
+  if (!li) return;
+
+  const unreadSpan = li.querySelector(".chat-unread-count");
+  if (!unreadSpan) return;
+  unreadSpan.remove(); // Remove the element from the DOM
 }
 
 export function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
@@ -512,3 +537,11 @@ export async function sendMessage(senderId, recieverId) {
 }
 
 window.sendMessage = sendMessage;
+
+export function resetDividerInsertedMap() {
+  dividerInsertedMap = {};
+}
+
+export function resetCurrentScrollableId() {
+  currentScrollableId = "";
+}

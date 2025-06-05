@@ -43,7 +43,12 @@ export function connectWebSocket() {
       );
       if (!scrollable) return;
 
-      messages.addSingleMessageAppend(msg, senderId, recieverID, scrollable);
+      if (messages.currentScrollableId === scrollable.id) {
+        messages.addSingleMessageAppend(msg, senderId, recieverID, scrollable);
+        if (senderId !== userId) {
+          await messages.markAsRead(senderId, recieverID);
+        }
+      }
     } else if (data.type === "message_deleted") {
       const msg = JSON.parse(data.payload);
       let senderId = msg.SenderID;
