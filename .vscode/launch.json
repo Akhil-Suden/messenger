@@ -9,7 +9,7 @@
       "program": "${workspaceFolder}/cmd/main.go",
       "env": {},
       "args": [],
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/cmd",
       "buildFlags": ""
     },
     {
