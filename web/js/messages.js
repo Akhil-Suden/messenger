@@ -1,49 +1,10 @@
-let token = "";
-let userId = "";
-const dividerInsertedMap = {};
-let currentPage = 1;
-const limit = 1000;
-let isLoading = false;
+export const dividerInsertedMap = {};
+export let currentPage = 1;
+export const limit = 1000;
+export let isLoading = false;
+export let userId = "";
 
-async function register() {
-  const res = await fetch("/api/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: document.getElementById("reg-username").value,
-      email: document.getElementById("reg-email").value,
-      password: document.getElementById("reg-password").value,
-    }),
-  });
-  alert("Registered");
-}
-
-async function login() {
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: document.getElementById("login-username").value,
-      password: document.getElementById("login-password").value,
-    }),
-  });
-  const data = await res.json();
-  token = data.token;
-  localStorage.setItem("token", token);
-  localStorage.setItem("username", data.username);
-  localStorage.setItem("userid", data.userid);
-
-  document.getElementById("login").classList.add("hidden");
-  document.getElementById("register").classList.add("hidden");
-  document.getElementById("main").classList.remove("hidden");
-  document.getElementById("current-user").classList.remove("hidden");
-  document.getElementById("username-display").textContent = `${data.username}`;
-  document.getElementById("logout-btn").addEventListener("click", logout);
-  connectWebSocket();
-  await loadUsers();
-}
-
-async function loadUsers() {
+export async function loadUsers() {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/users", {
     headers: { Authorization: "Bearer " + token },
@@ -74,117 +35,7 @@ async function loadUsers() {
   });
 }
 
-window.onload = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    // If token is missing, stay on login page
-    return;
-  }
-
-  document.getElementById("login").classList.add("hidden");
-  document.getElementById("register").classList.add("hidden");
-  document.getElementById("main").classList.remove("hidden");
-  document.getElementById("current-user").classList.remove("hidden");
-
-  loadUsers();
-  connectWebSocket();
-  document.getElementById(
-    "username-display"
-  ).textContent = `${localStorage.getItem("username")}`;
-  document.getElementById("logout-btn").addEventListener("click", logout);
-};
-
-function logout() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("username");
-
-  document.getElementById("main").classList.add("hidden");
-  document.getElementById("login").classList.remove("hidden");
-  document.getElementById("register").classList.remove("hidden");
-}
-
-let socket;
-
-function connectWebSocket() {
-  const token = localStorage.getItem("token");
-  if (!token) return;
-
-  // Replace with your WebSocket endpoint (adjust port/path as needed)
-  const socket = new WebSocket(
-    `wss://${window.location.host}/ws?token=${token}`
-  );
-
-  socket.onopen = () => {
-    socket.send(
-      JSON.stringify({
-        token: localStorage.getItem("token"),
-      })
-    );
-    console.log("WebSocket connected");
-  };
-
-  socket.onmessage = async (event) => {
-    const data = JSON.parse(event.data);
-
-    if (data.type === "message") {
-      msg = JSON.parse(data.payload);
-      const senderId = msg.SenderID;
-      const recieverID = msg.ReceiverID;
-      const userId = localStorage.getItem("userid");
-
-      showMessagePreviews(senderId, recieverID, msg.Content);
-      if (userId !== senderId) {
-        showCount(senderId);
-      }
-
-      const scrollable = document.getElementById(
-        getScrollableId(senderId, recieverID)
-      );
-      if (!scrollable) return;
-
-      addSingleMessageAppend(msg, senderId, recieverID, scrollable);
-    } else if (data.type === "message_deleted") {
-      const msg = JSON.parse(data.payload);
-      let senderId = msg.SenderID;
-      let recieverID = msg.ReceiverID;
-      let senderName = msg.Sender.Username;
-
-      await loadConversationWith(senderId, recieverID, msg.SenderUsername);
-
-      const scrollable = document.getElementById(
-        getScrollableId(senderId, recieverID)
-      );
-      if (!scrollable) return;
-
-      userId = localStorage.getItem("userid");
-      if (userId === senderId) {
-        //If message is deleted by current user, view conversation with receiver
-        senderId = recieverID;
-        recieverID = userId;
-        senderName = msg.Receiver.Username;
-      }
-      viewConversationWith(
-        senderId,
-        recieverID,
-        senderName,
-        scrollable.scrollTop,
-        false
-      );
-    }
-
-    socket.onclose = () => {
-      console.log("WebSocket closed. Reconnecting...");
-      setTimeout(connectWebSocket, 3000); // retry after 3s
-    };
-
-    socket.onerror = (err) => {
-      console.error("WebSocket error", err);
-    };
-  };
-}
-
-async function loadConversationWith(senderId, recieverID, senderName) {
+export async function loadConversationWith(senderId, recieverID, senderName) {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/messages?sender_id=" + senderId, {
     headers: { Authorization: "Bearer " + token },
@@ -236,7 +87,7 @@ async function loadConversationWith(senderId, recieverID, senderName) {
   }
 }
 
-function showCount(senderId) {
+export function showCount(senderId) {
   const li = document.getElementById(`user-${senderId}`);
   if (!li) return;
 
@@ -249,7 +100,7 @@ function showCount(senderId) {
   unreadSpan.textContent = newCount > 0 ? ` (${newCount} new)` : "";
 }
 
-async function viewConversationWith(
+export async function viewConversationWith(
   senderId,
   recieverId,
   senderName,
@@ -330,7 +181,9 @@ async function viewConversationWith(
   unreadSpan.textContent = ""; // Clear unread count
 }
 
-const showMessagePreviews = (senderId, recieverID, message) => {
+window.viewConversationWith = viewConversationWith;
+
+export const showMessagePreviews = (senderId, recieverID, message) => {
   let previewEl;
   if (recieverID === localStorage.getItem("userid")) {
     previewEl = document.getElementById(`preview-${senderId}`);
@@ -343,7 +196,7 @@ const showMessagePreviews = (senderId, recieverID, message) => {
   previewEl.style.opacity = 1;
 };
 
-async function markAsRead(senderId, recieverId) {
+export async function markAsRead(senderId, recieverId) {
   const token = localStorage.getItem("token");
   await fetch("/api/messages/read", {
     method: "POST",
@@ -358,7 +211,7 @@ async function markAsRead(senderId, recieverId) {
   });
 }
 
-async function showDeleteOptionsForSelf(
+export async function showDeleteOptionsForSelf(
   msgId,
   senderId,
   senderName,
@@ -390,13 +243,13 @@ async function showDeleteOptionsForSelf(
   }
 }
 
-async function showDeleteOptionsForEveryone(
+export async function showDeleteOptionsForEveryone(
   msgId,
   senderId,
   senderName,
   scrollable
 ) {
-  token = localStorage.getItem("token");
+  let token = localStorage.getItem("token");
   if (!token) {
     console.error("Token not found in localStorage");
     return;
@@ -404,7 +257,7 @@ async function showDeleteOptionsForEveryone(
 
   const scrollTopBefore = scrollable.scrollTop;
 
-  recieverId = localStorage.getItem("userid");
+  let recieverId = localStorage.getItem("userid");
   if (!recieverId) {
     console.error("Receiver ID not found in localStorage");
     return;
@@ -432,7 +285,7 @@ async function showDeleteOptionsForEveryone(
   }
 }
 
-async function loadMoreMessages(senderId, recieverId) {
+export async function loadMoreMessages(senderId, recieverId) {
   if (isLoading) return;
   isLoading = true;
   currentPage++;
@@ -469,7 +322,7 @@ async function loadMoreMessages(senderId, recieverId) {
   isLoading = false;
 }
 
-function addMessagesInScrollable(
+export function addMessagesInScrollable(
   scrollable,
   messages,
   senderId,
@@ -494,7 +347,7 @@ function addMessagesInScrollable(
   });
 }
 
-function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
+export function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
   userId = localStorage.getItem("userid");
   if (!userId) return;
 
@@ -532,7 +385,7 @@ function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
     return;
   }
 
-  timestamp = new Date(m.CreatedAt).toLocaleString();
+  let timestamp = new Date(m.CreatedAt).toLocaleString();
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "🗑️";
@@ -561,7 +414,7 @@ function addSingleMessageAppend(m, senderId, recieverId, scrollable) {
   scrollable.appendChild(div);
 }
 
-function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
+export function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
   userId = localStorage.getItem("userid");
   if (!userId) return;
 
@@ -598,7 +451,7 @@ function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
     return;
   }
 
-  timestamp = new Date(m.CreatedAt).toLocaleString();
+  let timestamp = new Date(m.CreatedAt).toLocaleString();
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "🗑️";
@@ -627,12 +480,12 @@ function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
   scrollable.prepend(div); // Add at top
 }
 
-function getScrollableId(userId1, userId2) {
+export function getScrollableId(userId1, userId2) {
   const [id1, id2] = [userId1, userId2].sort(); // Sort alphabetically
   return `message-scrollable-${id1}-${id2}`;
 }
 
-async function sendMessage(senderId, recieverId) {
+export async function sendMessage(senderId, recieverId) {
   const input = document.getElementById(`input-${senderId}-${recieverId}`);
   const content = input.value.trim();
   if (!content) return;
@@ -658,18 +511,4 @@ async function sendMessage(senderId, recieverId) {
   }
 }
 
-// async function sendMessage() {
-//   const token = localStorage.getItem("token");
-//   const res = await fetch("/api/messages", {
-//     method: "POST",
-//     headers: {
-//       "Content-Type": "application/json",
-//       Authorization: "Bearer " + token,
-//     },
-//     body: JSON.stringify({
-//       receiver_id: document.getElementById("users").value,
-//       content: document.getElementById("message").value,
-//     }),
-//   });
-//   document.getElementById("message").value = "";
-// }
+window.sendMessage = sendMessage;
