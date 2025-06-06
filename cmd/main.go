@@ -18,8 +18,10 @@ func main() {
 	// Set up router
 	r := routes.SetupRouter()
 
-	r.Static("/static", "../web")        // Serve CSS/JS files from web folder
-	r.LoadHTMLFiles("../web/index.html") // If rendering HTML from server
+	r.Static("/static", "../web") // Serve CSS/JS files from web folder
+	r.Static("/favicon", "../favicon")
+	r.StaticFile("/service-worker.js", "../web/service-worker.js") // Serve service worker
+	r.LoadHTMLFiles("../web/index.html")                           // If rendering HTML from server
 
 	r.GET("/", func(c *gin.Context) {
 		c.File("../web/index.html")
