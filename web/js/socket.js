@@ -33,6 +33,19 @@ export function connectWebSocket() {
       const recieverID = msg.ReceiverID;
       const userId = localStorage.getItem("userid");
 
+      if (userId === senderId) {
+        messages.latestMessageMap.set(recieverID, new Date(msg.CreatedAt));
+      } else {
+        messages.latestMessageMap.set(senderId, new Date(msg.CreatedAt));
+      }
+
+      messages.users.sort((a, b) => {
+        const dateA = messages.latestMessageMap.get(a.ID) || new Date(0);
+        const dateB = messages.latestMessageMap.get(b.ID) || new Date(0);
+        return dateB - dateA;
+      });
+      messages.renderChatList();
+
       messages.showMessagePreviews(senderId, recieverID, msg.Content);
       if (userId !== senderId) {
         messages.showCount(senderId);
@@ -55,12 +68,6 @@ export function connectWebSocket() {
       let recieverID = msg.ReceiverID;
       let senderName = msg.Sender.Username;
 
-      await messages.loadConversationWith(
-        senderId,
-        recieverID,
-        msg.SenderUsername
-      );
-
       const scrollable = document.getElementById(
         messages.getScrollableId(senderId, recieverID)
       );
@@ -73,6 +80,11 @@ export function connectWebSocket() {
         recieverID = userId;
         senderName = msg.Receiver.Username;
       }
+      await messages.loadConversationWith(
+        senderId,
+        recieverID,
+        msg.SenderUsername
+      );
       messages.viewConversationWith(
         senderId,
         recieverID,

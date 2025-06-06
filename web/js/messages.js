@@ -4,13 +4,15 @@ export let currentPage = 1;
 export const limit = 1000;
 export let isLoading = false;
 export let userId = "";
+export let latestMessageMap = new Map();
+export let users = [];
 
 export async function loadUsers() {
   const token = localStorage.getItem("token");
   const res = await fetch("/api/users", {
     headers: { Authorization: "Bearer " + token },
   });
-  const users = await res.json();
+  users = await res.json();
 
   //Logged in user ID
   let userID = localStorage.getItem("userid");
@@ -19,70 +21,86 @@ export async function loadUsers() {
     return;
   }
 
-  const list = document.getElementById("chat-list");
-  list.innerHTML = "";
-
-  users.forEach((sender) => {
-    const li = document.createElement("li");
-    li.id = `user-${sender.ID}`;
-    li.classList.add("chat-item"); // add the CSS class for styling
-
-    li.innerHTML = `
-    <div class="chat-info">
-      <div class="chat-username">${sender.Username}</div>
-      <div class="message-preview" id="preview-${sender.ID}"></div>
-    </div>
-    <div class="chat-unread-count" id="unread-${sender.ID}"></div>
-  `;
-
-    // Optional: make the whole li clickable instead of a separate button
-    li.addEventListener("click", () => {
-      viewConversationWith(sender.ID, userID, sender.Username, null, true);
-    });
-
-    list.appendChild(li);
-    loadConversationWith(sender.ID, userID, sender.Username);
+  users.sort((a, b) => {
+    const dateA = latestMessageMap.get(a.ID) || new Date(0);
+    const dateB = latestMessageMap.get(b.ID) || new Date(0);
+    return dateB - dateA;
+  });
+  renderChatList();
+  const userCopy = JSON.parse(JSON.stringify(users)); // Create a copy of the users array
+  userCopy.forEach((chatUser) => {
+    loadConversationWith(chatUser.ID, userID, chatUser.Username);
   });
 }
 
-export async function loadConversationWith(senderId, recieverID, senderName) {
+export async function loadConversationWith(
+  chatUser,
+  loggedInUserId,
+  chatUserName
+) {
   const token = localStorage.getItem("token");
-  const res = await fetch("/api/messages?sender_id=" + senderId, {
+  const res = await fetch("/api/messages?sender_id=" + chatUser, {
     headers: { Authorization: "Bearer " + token },
   });
   const messages = await res.json();
   if (!messages || messages.length === 0) return;
 
+  const latestMessage = messages[0];
+  latestMessageMap.set(chatUser, new Date(latestMessage.CreatedAt));
+
   let userId = localStorage.getItem("userid");
+
+  let lastRenderTime = 0;
 
   // Show toast previews for unread messages
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (!m.Read && !(userId === senderId) && !(m.ReceiverID === senderId)) {
+    if (!m.Read && !(userId === chatUser) && !(m.ReceiverID === chatUser)) {
       // If the message is unread and not sent by the current user
       if (!m.Delivered) {
         if (!m.IsDeleted) {
-          showMessagePreviews(senderId, m.ReceiverID, m.Content);
-          showCount(senderId);
-          // Wait for 500 milliseconds (half a second)
+          const now = Date.now();
+          if (now - lastRenderTime > 2000) {
+            // render every 2 seconds
+            users.sort((a, b) => {
+              const dateA = latestMessageMap.get(a.ID) || new Date(0);
+              const dateB = latestMessageMap.get(b.ID) || new Date(0);
+              return dateB - dateA;
+            });
+            renderChatList();
+            lastRenderTime = now;
+          }
+
+          showMessagePreviews(chatUser, m.ReceiverID, m.Content);
+          showCount(chatUser);
+
+          // Wait for 200 milliseconds
           await new Promise((resolve) => setTimeout(resolve, 200));
         }
       } else {
-        showCount(senderId);
+        showCount(chatUser);
       }
     }
   }
+
+  users.sort((a, b) => {
+    const dateA = latestMessageMap.get(a.ID) || new Date(0);
+    const dateB = latestMessageMap.get(b.ID) || new Date(0);
+    return dateB - dateA;
+  });
+  renderChatList();
+
   if (!messages[0].IsDeleted) {
-    showMessagePreviews(senderId, messages[0].ReceiverID, messages[0].Content);
+    showMessagePreviews(chatUser, messages[0].ReceiverID, messages[0].Content);
   } else {
     showMessagePreviews(
-      senderId,
+      chatUser,
       messages[0].ReceiverID,
       "This message was Deleted"
     );
   }
 
-  if (!(senderId === userId)) {
+  if (!(chatUser === userId)) {
     await fetch("/api/messages/delivered", {
       method: "POST",
       headers: {
@@ -90,8 +108,8 @@ export async function loadConversationWith(senderId, recieverID, senderName) {
         Authorization: "Bearer " + token,
       },
       body: JSON.stringify({
-        sender_id: senderId,
-        receiver_id: recieverID, // Assuming recieverId is the current user's I
+        sender_id: chatUser,
+        receiver_id: loggedInUserId, // Assuming recieverId is the current user's I
       }),
     });
   }
@@ -111,7 +129,7 @@ export function showCount(senderId) {
   const newCount = count + 1;
   unreadSpan.textContent = newCount > 0 ? `${newCount}` : "";
   if (newCount > 0) {
-    unreadSpan.style.display = "inline"; // Show the count
+    unreadSpan.style.display = ""; // Show the count
   }
 }
 
@@ -187,10 +205,10 @@ export async function viewConversationWith(
 
 window.viewConversationWith = viewConversationWith;
 
-export const showMessagePreviews = (senderId, recieverID, message) => {
+export const showMessagePreviews = (chatUserId, recieverID, message) => {
   let previewEl;
   if (recieverID === localStorage.getItem("userid")) {
-    previewEl = document.getElementById(`preview-${senderId}`);
+    previewEl = document.getElementById(`preview-${chatUserId}`);
   } else {
     previewEl = document.getElementById(`preview-${recieverID}`);
   }
@@ -199,6 +217,45 @@ export const showMessagePreviews = (senderId, recieverID, message) => {
   previewEl.textContent = message;
   previewEl.style.opacity = 1;
 };
+
+export function renderChatList() {
+  userId = localStorage.getItem("userid");
+  const list = document.getElementById("chat-list");
+  users.forEach((sender) => {
+    let previewValue = "";
+    let unreadValue = "";
+    if (!document.getElementById(`preview-${sender.ID}`)) {
+      previewValue = "";
+    } else {
+      previewValue = document.getElementById(
+        `preview-${sender.ID}`
+      ).textContent;
+    }
+    if (!document.getElementById(`unread-${sender.ID}`)) {
+      unreadValue = "";
+    } else {
+      unreadValue = document.getElementById(`unread-${sender.ID}`).textContent;
+    }
+    if (document.getElementById(`user-${sender.ID}`)) {
+      document.getElementById(`user-${sender.ID}`).remove(); // Remove existing element if it exists
+    }
+    const shouldHide = unreadValue === "" ? 'style="display: none;"' : "";
+    const li = document.createElement("li");
+    li.id = `user-${sender.ID}`;
+    li.classList.add("chat-item");
+    li.innerHTML = `
+      <div class="chat-info">
+        <div class="chat-username">${sender.Username}</div>
+        <div class="message-preview" id="preview-${sender.ID}">${previewValue}</div>
+      </div>
+      <div class="chat-unread-count" id="unread-${sender.ID}" ${shouldHide}>${unreadValue}</div>
+    `;
+    li.addEventListener("click", () => {
+      viewConversationWith(sender.ID, userId, sender.Username, null, true);
+    });
+    list.appendChild(li);
+  });
+}
 
 export async function markAsRead(senderId, recieverId) {
   const token = localStorage.getItem("token");

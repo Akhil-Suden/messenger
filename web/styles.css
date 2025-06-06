@@ -258,7 +258,7 @@ select {
   padding: 0 8px;
   box-sizing: border-box;
   user-select: none;
-  display: none; /* Hide by default */
+  display: flex;
 }
 
 .message-area {
