@@ -13,6 +13,7 @@ export async function register() {
   });
   alert("Registered");
 }
+window.register = register;
 
 export async function login() {
   const res = await fetch("/api/login", {
@@ -48,3 +49,4 @@ export function logout() {
   document.getElementById("login").classList.remove("hidden");
   document.getElementById("register").classList.remove("hidden");
 }
+window.logout = logout;
