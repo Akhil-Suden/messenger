@@ -138,12 +138,9 @@ func SendMessage(c *gin.Context) {
 		senderConn.WriteJSON(payload)
 	}
 	userSubscription, err := repository.GetSubscribeData(req.ReceiverID)
-	if err != nil {
-		log.Printf("Error fetching subscription data: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscription data"})
-		return
+	if userSubscription != nil && err == nil {
+		notifications.SendNotification(userSubscription, "New message!", vapidPrivate, vapidPublic)
 	}
-	notifications.SendNotification(userSubscription, "New message!", vapidPrivate, vapidPublic)
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})
 }

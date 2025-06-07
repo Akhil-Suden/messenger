@@ -7,23 +7,26 @@ import (
 	"messenger/internal/notifications"
 )
 
-func GetSubscribeData(receiverID string) (*notifications.Subscription, error) {
-	var sub models.PushSubscription
-	err := db.DB.Where("user_id = ?", receiverID).First(&sub).Error
+func GetSubscribeData(receiverID string) (*[]notifications.Subscription, error) {
+	var sub []models.PushSubscription
+	err := db.DB.Where("user_id = ?", receiverID).Find(&sub).Error
 	if err != nil {
 		log.Printf("No subscription found for user %s", receiverID)
 		// Proceed without push
 		return nil, err
 	}
-	subscription := notifications.Subscription{
-		Endpoint: sub.Endpoint,
-		Keys: struct {
-			P256dh string `json:"p256dh"`
-			Auth   string `json:"auth"`
-		}{
-			P256dh: sub.P256dh,
-			Auth:   sub.Auth,
-		},
+	var subscription []notifications.Subscription
+	for i := range sub {
+		subscription = append(subscription, notifications.Subscription{
+			Endpoint: sub[i].Endpoint,
+			Keys: struct {
+				P256dh string `json:"p256dh"`
+				Auth   string `json:"auth"`
+			}{
+				P256dh: sub[i].P256dh,
+				Auth:   sub[i].Auth,
+			},
+		})
 	}
 	return &subscription, nil
 }
