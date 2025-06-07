@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"fmt"
+	"errors"
 	"messenger/internal/db"
 	"messenger/internal/models"
 	"messenger/internal/notifications"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func HandleSubscribe(c *gin.Context) {
@@ -18,20 +19,39 @@ func HandleSubscribe(c *gin.Context) {
 		return
 	}
 
-	// For now, just print or log the subscription
-	fmt.Printf("Received subscription: %+v\n", sub)
+	var existing models.PushSubscription
+	result := db.DB.Where("user_id = ?", userId).First(&existing)
 
-	tx := db.DB.Create(&models.PushSubscription{
-		UserID:         userId, // If you have user sessions
-		Endpoint:       sub.Endpoint,
-		P256dh:         sub.Keys.P256dh,
-		Auth:           sub.Keys.Auth,
-		ExpirationTime: sub.ExpirationTime,
-	})
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save subscription"})
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Subscription received"})
+	// If subscription exists, update it
+	if result.RowsAffected > 0 {
+		existing.Endpoint = sub.Endpoint
+		existing.P256dh = sub.Keys.P256dh
+		existing.Auth = sub.Keys.Auth
+		existing.ExpirationTime = sub.ExpirationTime
+
+		if err := db.DB.Save(&existing).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update subscription"})
+			return
+		}
+	} else {
+		// No existing subscription — create new one
+		newSub := models.PushSubscription{
+			UserID:         userId,
+			Endpoint:       sub.Endpoint,
+			P256dh:         sub.Keys.P256dh,
+			Auth:           sub.Keys.Auth,
+			ExpirationTime: sub.ExpirationTime,
+		}
+		if err := db.DB.Create(&newSub).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subscription"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Subscription stored successfully"})
 }

@@ -139,7 +139,7 @@ func SendMessage(c *gin.Context) {
 	}
 	userSubscription, err := repository.GetSubscribeData(req.ReceiverID)
 	if userSubscription != nil && err == nil {
-		notifications.SendNotification(userSubscription, "New message!", vapidPrivate, vapidPublic)
+		notifications.SendNotification(userSubscription, string(msgMar), vapidPrivate, vapidPublic)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})

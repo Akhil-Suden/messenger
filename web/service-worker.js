@@ -38,13 +38,26 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", function (event) {
-  let title = "New Notification";
+  let title = "New Message";
   let options = {
-    body: event.data ? event.data.text() : "You have a new message.",
+    body: "You have a new message.",
     icon: "/favicon/favicon.svg",
     tag: "message-" + Date.now(),
   };
 
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      title = data.Sender.Username || title;
+      options.body = data.Content || options.body;
+      options.icon = data.icon || options.icon;
+    } catch (e) {
+      console.error("Failed to parse push data as JSON:", e);
+      options.body = event.data.text(); // Fallback to raw text
+    }
+  }
+
   event.waitUntil(self.registration.showNotification(title, options));
+
   console.log("Push event received:", event);
 });
