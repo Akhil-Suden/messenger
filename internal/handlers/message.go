@@ -4,17 +4,26 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"messenger/internal/db"
 	"messenger/internal/models"
+	"messenger/internal/notifications"
 	"messenger/internal/repository"
 	"messenger/internal/ws"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+var vapidPrivate, vapidPublic string
+
+func init() {
+	vapidPrivate = os.Getenv("VAPID_PRIVATE_KEY")
+	vapidPublic = os.Getenv("VAPID_PUBLIC_KEY")
+}
 
 type SendMessageRequest struct {
 	ReceiverID string `json:"receiver_id" binding:"required,uuid"`
@@ -128,6 +137,13 @@ func SendMessage(c *gin.Context) {
 	if ok2 && !(senderId == req.ReceiverID) {
 		senderConn.WriteJSON(payload)
 	}
+	userSubscription, err := repository.GetSubscribeData(req.ReceiverID)
+	if err != nil {
+		log.Printf("Error fetching subscription data: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscription data"})
+		return
+	}
+	notifications.SendNotification(userSubscription, "New message!", vapidPrivate, vapidPublic)
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Message sent successfully", "id": message.ID})
 }

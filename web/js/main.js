@@ -5,10 +5,6 @@ import * as socket from "./socket.js";
 import * as auth from "./auth.js";
 
 window.onload = () => {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/service-worker.js");
-  }
-
   const token = localStorage.getItem("token");
 
   if (!token) {

@@ -33,6 +33,7 @@ func SetupRouter() *gin.Engine {
 	auth.POST("/messages/delivered", handlers.UpdateDeliverStatus)
 	auth.DELETE("/messages/delete/self", handlers.DeleteMessageForSelf)
 	auth.DELETE("/messages/delete/everyone", handlers.DeleteMessageForEveryone)
+	auth.POST("/subscribe", handlers.HandleSubscribe)
 
 	// Real-time WebSocket route
 	auth.GET("/ws", handlers.ChatWebSocket)

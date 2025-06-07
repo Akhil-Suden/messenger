@@ -1,5 +1,6 @@
 import * as socket from "./socket.js";
 import * as messages from "./messages.js";
+import * as push from "./push.js";
 
 export async function register() {
   const res = await fetch("/api/register", {
@@ -37,6 +38,7 @@ export async function login() {
   document.getElementById("username-display").textContent = `${data.username}`;
   document.getElementById("logout-btn").addEventListener("click", logout);
   socket.connectWebSocket();
+  push.subscribeUser();
   await messages.loadUsers();
 }
 window.login = login;

@@ -19,5 +19,5 @@ func Connect() error {
 	}
 
 	// Auto migrate models
-	return DB.AutoMigrate(&models.User{}, &models.Message{}, &models.Chat{})
+	return DB.AutoMigrate(&models.User{}, &models.Message{}, &models.Chat{}, models.PushSubscription{})
 }

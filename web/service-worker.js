@@ -25,3 +25,26 @@ self.addEventListener("fetch", (e) => {
     })
   );
 });
+
+self.addEventListener("install", (event) => {
+  console.log("Service Worker installing...");
+  // Perform install steps
+  event.waitUntil(self.skipWaiting()); // Ensures the service worker activates immediately
+});
+
+self.addEventListener("activate", (event) => {
+  console.log("Service Worker activated.");
+  event.waitUntil(self.clients.claim()); // Makes the service worker take control immediately
+});
+
+self.addEventListener("push", function (event) {
+  let title = "New Notification";
+  let options = {
+    body: event.data ? event.data.text() : "You have a new message.",
+    icon: "/favicon/favicon.svg",
+    tag: "message-" + Date.now(),
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+  console.log("Push event received:", event);
+});
