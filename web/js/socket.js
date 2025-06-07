@@ -58,7 +58,7 @@ export function connectWebSocket() {
 
       if (messages.currentScrollableId === scrollable.id) {
         messages.addSingleMessageAppend(msg, senderId, recieverID, scrollable);
-        if (senderId !== userId) {
+        if (senderId !== userId || senderId === recieverID) {
           await messages.markAsRead(senderId, recieverID);
         }
       }
