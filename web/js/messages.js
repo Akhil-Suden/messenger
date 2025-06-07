@@ -426,6 +426,9 @@ export async function addSingleMessageAppend(
     !m.Read &&
     !(userId === m.SenderID)
   ) {
+console.log("Divider Key:", getScrollableId(chatUserId, loggedInUserId));
+console.log("Map Value:", dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)]);
+console.log("m.Read:", m.Read, "m.SenderID:", m.SenderID, "userId:", userId);
     const divider = document.createElement("div");
     divider.id = `divider-${getScrollableId(chatUserId, loggedInUserId)}`;
     divider.style.borderTop = "1px solid #888";
