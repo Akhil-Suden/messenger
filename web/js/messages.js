@@ -134,13 +134,13 @@ export function showCount(senderId) {
 }
 
 export async function viewConversationWith(
-  senderId,
-  recieverId,
+  chatUserId,
+  loggedInUserId,
   senderName,
   scrollTopBefore,
   isFromViewButton = false
 ) {
-  currentScrollableId = getScrollableId(senderId, recieverId);
+  currentScrollableId = getScrollableId(chatUserId, loggedInUserId);
   const token = localStorage.getItem("token");
 
   isLoading = true;
@@ -150,7 +150,7 @@ export async function viewConversationWith(
     msgLimit = limit; // Reset limit to 20 for the first view
   }
   const res = await fetch(
-    `/api/messages?sender_id=${senderId}&page=1&limit=${msgLimit}`,
+    `/api/messages?sender_id=${chatUserId}&page=1&limit=${msgLimit}`,
     {
       headers: { Authorization: "Bearer " + token },
     }
@@ -168,7 +168,7 @@ export async function viewConversationWith(
 
   const scrollable = document.createElement("div");
   scrollable.className = "message-list";
-  scrollable.id = getScrollableId(senderId, recieverId);
+  scrollable.id = getScrollableId(chatUserId, loggedInUserId);
   scrollable.dataset.allRead = "true";
 
   box.appendChild(scrollable);
@@ -179,11 +179,11 @@ export async function viewConversationWith(
   inputContainer.innerHTML = `
   <input
     type="text"
-    id="input-${senderId}-${recieverId}"
+    id="input-${chatUserId}-${loggedInUserId}"
     placeholder="Type a message"
     class="whatsapp-message-input"
   />
-  <button class="whatsapp-send-button" onclick="sendMessage('${senderId}', '${recieverId}')">
+  <button class="whatsapp-send-button" onclick="sendMessage('${chatUserId}', '${loggedInUserId}')">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
       <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
     </svg>
@@ -195,8 +195,8 @@ export async function viewConversationWith(
   addMessagesInScrollable(
     scrollable,
     messages,
-    senderId,
-    recieverId,
+    chatUserId,
+    loggedInUserId,
     senderName,
     scrollTopBefore
   );
@@ -221,37 +221,39 @@ export const showMessagePreviews = (chatUserId, recieverID, message) => {
 export function renderChatList() {
   userId = localStorage.getItem("userid");
   const list = document.getElementById("chat-list");
-  users.forEach((sender) => {
+  users.forEach((chatUser) => {
     let previewValue = "";
     let unreadValue = "";
-    if (!document.getElementById(`preview-${sender.ID}`)) {
+    if (!document.getElementById(`preview-${chatUser.ID}`)) {
       previewValue = "";
     } else {
       previewValue = document.getElementById(
-        `preview-${sender.ID}`
+        `preview-${chatUser.ID}`
       ).textContent;
     }
-    if (!document.getElementById(`unread-${sender.ID}`)) {
+    if (!document.getElementById(`unread-${chatUser.ID}`)) {
       unreadValue = "";
     } else {
-      unreadValue = document.getElementById(`unread-${sender.ID}`).textContent;
+      unreadValue = document.getElementById(
+        `unread-${chatUser.ID}`
+      ).textContent;
     }
-    if (document.getElementById(`user-${sender.ID}`)) {
-      document.getElementById(`user-${sender.ID}`).remove(); // Remove existing element if it exists
+    if (document.getElementById(`user-${chatUser.ID}`)) {
+      document.getElementById(`user-${chatUser.ID}`).remove(); // Remove existing element if it exists
     }
     const shouldHide = unreadValue === "" ? 'style="display: none;"' : "";
     const li = document.createElement("li");
-    li.id = `user-${sender.ID}`;
+    li.id = `user-${chatUser.ID}`;
     li.classList.add("chat-item");
     li.innerHTML = `
       <div class="chat-info">
-        <div class="chat-username">${sender.Username}</div>
-        <div class="message-preview" id="preview-${sender.ID}">${previewValue}</div>
+        <div class="chat-username">${chatUser.Username}</div>
+        <div class="message-preview" id="preview-${chatUser.ID}">${previewValue}</div>
       </div>
-      <div class="chat-unread-count" id="unread-${sender.ID}" ${shouldHide}>${unreadValue}</div>
+      <div class="chat-unread-count" id="unread-${chatUser.ID}" ${shouldHide}>${unreadValue}</div>
     `;
     li.addEventListener("click", () => {
-      viewConversationWith(sender.ID, userId, sender.Username, null, true);
+      viewConversationWith(chatUser.ID, userId, chatUser.Username, null, true);
     });
     list.appendChild(li);
   });
@@ -346,14 +348,14 @@ export async function showDeleteOptionsForEveryone(
   }
 }
 
-export async function loadMoreMessages(senderId, recieverId) {
+export async function loadMoreMessages(chatUserId, loggedInUserId) {
   if (isLoading) return;
   isLoading = true;
   currentPage++;
 
   const token = localStorage.getItem("token");
   const res = await fetch(
-    `/api/messages?sender_id=${senderId}&page=${currentPage}&limit=${limit}`,
+    `/api/messages?sender_id=${chatUserId}&page=${currentPage}&limit=${limit}`,
     {
       headers: { Authorization: "Bearer " + token },
     }
@@ -366,14 +368,14 @@ export async function loadMoreMessages(senderId, recieverId) {
   }
 
   const scrollable = document.getElementById(
-    getScrollableId(senderId, recieverId)
+    getScrollableId(chatUserId, loggedInUserId)
   );
 
   const prevScrollHeight = scrollable.scrollHeight;
 
   newMessages.forEach((m) => {
     const div = document.createElement("div");
-    addSingleMessagePrepend(m, senderId, recieverId, scrollable);
+    addSingleMessagePrepend(m, chatUserId, loggedInUserId, scrollable);
     scrollable.prepend(div); // Add at top
   });
 
@@ -386,19 +388,17 @@ export async function loadMoreMessages(senderId, recieverId) {
 export async function addMessagesInScrollable(
   scrollable,
   messages,
-  senderId,
-  recieverId,
+  chatUserId,
+  loggedInUserId,
   senderName,
   scrollTopBefore
 ) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    addSingleMessageAppend(m, senderId, recieverId, scrollable);
+    addSingleMessageAppend(m, chatUserId, loggedInUserId, scrollable);
   }
 
-  if (senderId !== userId) {
-    await markAsRead(senderId, recieverId);
-  }
+  await markAsRead(chatUserId, loggedInUserId);
 
   if (scrollTopBefore === null) {
     scrollTopBefore = scrollable.scrollHeight; // Default to bottom if not provided
@@ -407,44 +407,34 @@ export async function addMessagesInScrollable(
   scrollable.scrollTop = scrollTopBefore;
   scrollable.addEventListener("scroll", () => {
     if (scrollable.scrollTop === 0) {
-      loadMoreMessages(senderId, recieverId);
+      loadMoreMessages(chatUserId, loggedInUserId);
     }
   });
 }
 
 export async function addSingleMessageAppend(
   m,
-  senderId,
-  recieverId,
+  chatUserId,
+  loggedInUserId,
   scrollable
 ) {
   userId = localStorage.getItem("userid");
   if (!userId) return;
 
   if (
-    !dividerInsertedMap[getScrollableId(senderId, recieverId)] &&
+    !dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] &&
     !m.Read &&
-    !(userId === senderId)
+    !(userId === m.Sender.ID)
   ) {
     const divider = document.createElement("div");
-    divider.id = `divider-${getScrollableId(senderId, recieverId)}`;
+    divider.id = `divider-${getScrollableId(chatUserId, loggedInUserId)}`;
     divider.style.borderTop = "1px solid #888";
     divider.style.margin = "10px 0";
     divider.style.paddingTop = "5px";
     divider.textContent = "--- Unread Messages ---";
     scrollable.appendChild(divider);
-    dividerInsertedMap[getScrollableId(senderId, recieverId)] = true;
+    dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] = true;
     scrollable.dataset.allRead = "false";
-  }
-
-  if (userId === senderId) {
-    const divider = document.getElementById(
-      `divider-${getScrollableId(senderId, recieverId)}`
-    );
-    if (divider) {
-      divider.remove(); // Remove divider if sender is the current user
-      dividerInsertedMap[getScrollableId(senderId, recieverId)] = false;
-    }
   }
 
   const div = document.createElement("div");
@@ -474,7 +464,7 @@ export async function addSingleMessageAppend(
     deleteBtn.onclick = () =>
       showDeleteOptionsForEveryone(
         m.ID,
-        senderId,
+        chatUserId,
         m.Sender.Username,
         scrollable
       );
@@ -485,10 +475,10 @@ export async function addSingleMessageAppend(
 
   if (scrollable.dataset.allRead === "true") {
     //if there is no divider inserted
-    dividerInsertedMap[getScrollableId(senderId, recieverId)] = false;
+    dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] = false;
   }
 
-  const li = document.getElementById(`user-${senderId}`);
+  const li = document.getElementById(`user-${chatUserId}`);
   if (!li) return;
 
   const unreadSpan = li.querySelector(".chat-unread-count");
@@ -496,32 +486,37 @@ export async function addSingleMessageAppend(
   unreadSpan.remove(); // Remove the element from the DOM
 }
 
-export function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
+export function addSingleMessagePrepend(
+  m,
+  chatUserId,
+  loggedInUserId,
+  scrollable
+) {
   userId = localStorage.getItem("userid");
   if (!userId) return;
 
   if (
-    !dividerInsertedMap[getScrollableId(senderId, recieverId)] &&
+    !dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] &&
     !m.Read &&
-    !(userId === senderId)
+    !(userId === chatUserId)
   ) {
     const divider = document.createElement("div");
-    divider.id = `divider-${getScrollableId(senderId, recieverId)}`;
+    divider.id = `divider-${getScrollableId(chatUserId, loggedInUserId)}`;
     divider.style.borderTop = "1px solid #888";
     divider.style.margin = "10px 0";
     divider.style.paddingTop = "5px";
     divider.textContent = "--- Unread Messages ---";
     scrollable.appendChild(divider);
-    dividerInsertedMap[getScrollableId(senderId, recieverId)] = true;
+    dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] = true;
   }
 
-  if (userId === senderId) {
+  if (userId === chatUserId) {
     const divider = document.getElementById(
-      `divider-${getScrollableId(senderId, recieverId)}`
+      `divider-${getScrollableId(chatUserId, loggedInUserId)}`
     );
     if (divider) {
       divider.remove(); // Remove divider if sender is the current user
-      dividerInsertedMap[getScrollableId(senderId, recieverId)] = false;
+      dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] = false;
     }
   }
 
@@ -552,7 +547,7 @@ export function addSingleMessagePrepend(m, senderId, recieverId, scrollable) {
     deleteBtn.onclick = () =>
       showDeleteOptionsForEveryone(
         m.ID,
-        senderId,
+        chatUserId,
         m.Sender.Username,
         scrollable
       );
