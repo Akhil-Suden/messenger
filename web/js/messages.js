@@ -428,10 +428,8 @@ export async function addSingleMessageAppend(
   ) {
     const divider = document.createElement("div");
     divider.id = `divider-${getScrollableId(chatUserId, loggedInUserId)}`;
-    divider.style.borderTop = "1px solid #888";
-    divider.style.margin = "10px 0";
-    divider.style.paddingTop = "5px";
-    divider.textContent = "--- Unread Messages ---";
+    divider.className = "unread-divider";
+    divider.textContent = "Unread Messages";
     scrollable.appendChild(divider);
     dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] = true;
     scrollable.dataset.allRead = "false";
@@ -460,7 +458,39 @@ export async function addSingleMessageAppend(
         scrollable
       );
   } else {
-    div.textContent = `[${timestamp}] ${m.Sender.Username}: ${m.Content}`;
+    // Create the message bubble
+    const messageText = document.createElement("div");
+    messageText.className = "message-text";
+    messageText.textContent = m.Content;
+
+    // Create metadata container (time + status)
+    const messageMeta = document.createElement("div");
+    messageMeta.className = "message-meta";
+
+    // Time
+    const messageTime = document.createElement("span");
+    messageTime.className = "message-time";
+    messageTime.textContent = timestamp;
+
+    // Tick status
+    const messageStatus = document.createElement("span");
+    messageStatus.className = "message-status";
+    if (!m.Read || !m.Delivered) {
+      messageStatus.dataset.status = "sent";
+    } else if (m.Read) {
+      messageStatus.dataset.status = "read";
+    } else if (m.Delivered) {
+      messageStatus.dataset.status = "delivered";
+    }
+
+    // Assemble
+    messageMeta.appendChild(messageTime);
+    if (m.SenderID === userId) {
+      messageMeta.appendChild(messageStatus); // only show ticks for sender's messages
+    }
+
+    div.appendChild(messageText);
+    div.appendChild(messageMeta);
     deleteBtn.onclick = () =>
       showDeleteOptionsForEveryone(
         m.ID,
@@ -596,4 +626,16 @@ export function resetDividerInsertedMap() {
 
 export function resetCurrentScrollableId() {
   currentScrollableId = "";
+}
+
+export function updateMessageStatus(senderId, recieverId, status) {
+  const messageElement = document.querySelector(
+    `[data-message-id="${messageId}"]`
+  );
+  if (!messageElement) return;
+
+  const statusElement = messageElement.querySelector(".message-status");
+  if (!statusElement) return;
+
+  statusElement.dataset.status = status;
 }

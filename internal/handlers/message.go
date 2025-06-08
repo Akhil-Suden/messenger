@@ -113,11 +113,11 @@ func SendMessage(c *gin.Context) {
 
 	ws.ClientsMu.RLock()
 	receiverConn, ok1 := ws.Clients[req.ReceiverID]
-	ws.ClientsMu.RUnlock()
+	defer ws.ClientsMu.RUnlock()
 
 	ws.ClientsMu.RLock()
 	senderConn, ok2 := ws.Clients[senderId]
-	ws.ClientsMu.RUnlock()
+	defer ws.ClientsMu.RUnlock()
 
 	senderName, err := repository.GetUsernameFromDB(senderId)
 	if err != nil {
@@ -175,6 +175,20 @@ func UpdateReadStatus(c *gin.Context) {
 		return
 	}
 
+	ws.ClientsMu.RLock()
+	senderConn, ok := ws.Clients[senderUUID.String()]
+	defer ws.ClientsMu.RUnlock()
+
+	if ok {
+		payload := map[string]string{
+			"type":        "message_status",
+			"sender_id":   senderUUID.String(),
+			"receiver_id": receiverUUID.String(),
+			"status":      "read",
+		}
+		senderConn.WriteJSON(payload)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Read status updated successfully"})
 }
 
@@ -206,6 +220,19 @@ func UpdateDeliverStatus(c *gin.Context) {
 		Update("delivered", true).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update delivered status"})
 		return
+	}
+	ws.ClientsMu.RLock()
+	senderConn, ok := ws.Clients[senderUUID.String()]
+	defer ws.ClientsMu.RUnlock()
+
+	if ok {
+		payload := map[string]string{
+			"type":        "message_status",
+			"sender_id":   senderUUID.String(),
+			"receiver_id": receiverUUID.String(),
+			"status":      "delivered",
+		}
+		senderConn.WriteJSON(payload)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "delivered status updated successfully"})

@@ -54,6 +54,21 @@ export function connectWebSocket() {
       const scrollable = document.getElementById(
         messages.getScrollableId(senderId, recieverID)
       );
+
+      if (!(senderId === userId)) {
+        await fetch("/api/messages/delivered", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({
+            sender_id: senderId,
+            receiver_id: recieverID, // Assuming recieverId is the current user's I
+          }),
+        });
+      }
+
       if (!scrollable) return;
 
       if (messages.currentScrollableId === scrollable.id) {
@@ -92,6 +107,42 @@ export function connectWebSocket() {
         scrollable.scrollTop,
         false
       );
+    } else if (data.type === "message_status") {
+      // Handle message status updates (e.g., read, delivered)
+      let senderId = data.sender_id;
+      let recieverID = data.receiver_id;
+
+      const scrollable = document.getElementById(
+        messages.getScrollableId(senderId, recieverID)
+      );
+      if (!scrollable) return;
+
+      // Get all message elements within the scrollable container
+      const scrollMessages = scrollable.querySelectorAll(".message-right");
+
+      // Loop through each message and change its status
+      scrollMessages.forEach((message) => {
+        const statusElement = message.querySelector(".message-status");
+
+        // Check if the status element exists
+        if (statusElement) {
+          if (statusElement.dataset.status === "read") {
+            //do nothing
+            return;
+          } else if (
+            (statusElement.dataset.status === "delivered" ||
+              statusElement.dataset.status === "sent") &&
+            data.status === "read"
+          ) {
+            statusElement.dataset.status = "read";
+          } else if (
+            statusElement.dataset.status === "sent" &&
+            (data.status === "read" || data.status === "delivered")
+          ) {
+            statusElement.dataset.status = data.status;
+          }
+        }
+      });
     }
 
     socket.onclose = () => {
