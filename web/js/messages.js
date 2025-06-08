@@ -501,6 +501,16 @@ export async function addSingleMessageAppend(
   }
 
   div.appendChild(deleteBtn);
+  if (loggedInUserId === m.SenderID) {
+    const divider = document.getElementById(
+      `divider-${getScrollableId(chatUserId, loggedInUserId)}`
+    );
+    if (divider) {
+      divider.remove(); // Remove divider if sender is the current user
+      dividerInsertedMap[getScrollableId(chatUserId, loggedInUserId)] = false;
+      scrollable.dataset.allRead = "false";
+    }
+  }
   scrollable.appendChild(div);
 
   if (scrollable.dataset.allRead === "true") {

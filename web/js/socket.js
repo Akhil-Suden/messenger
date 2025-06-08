@@ -71,8 +71,15 @@ export function connectWebSocket() {
 
       if (!scrollable) return;
 
+      let chatUserID;
+      if (userId === msg.SenderID) {
+        chatUserID = msg.ReceiverID;
+      } else {
+        chatUserID = msg.SenderID;
+      }
+
       if (messages.currentScrollableId === scrollable.id) {
-        messages.addSingleMessageAppend(msg, senderId, recieverID, scrollable);
+        messages.addSingleMessageAppend(msg, chatUserID, userId, scrollable);
         if (senderId !== userId || senderId === recieverID) {
           await messages.markAsRead(senderId, recieverID);
         }
